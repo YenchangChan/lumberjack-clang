@@ -1,9 +1,6 @@
-import subprocess
-import glob
 import os.path
 import sys
 import platform
-import time
 import shutil
 
 # A static library is built per each one of the following directory list.
@@ -53,50 +50,7 @@ AddOption(
     help='installation prefix',
 )
 
-AddOption(
-    '--pack-version',
-    dest='pack_version',
-    type='string',
-    nargs=1,
-    action='store',
-    default='trunk',
-    help='version info, ex. 1.0.0.0',
-)
-
-AddOption(
-    '--date',
-    dest='date',
-    type='string',
-    nargs=1,
-    action='store',
-    default=time.strftime('%Y%m%d', time.localtime(time.time())),
-    help='date info, ex. 20220302 represents 2022/03/02',
-)
-
-AddOption(
-    '--release',
-    dest='release',
-    const=True,
-    action='store_const',
-    default=False,
-    help='compile with -O2 level',
-)
-
-def GetCommitID():
-    raw_commit = subprocess.check_output(['git','rev-parse','--short','HEAD'])
-    return raw_commit.strip().decode('utf-8')
-
 prefix = GetOption('prefix')
-commit_id = GetCommitID()
-pack_date = GetOption('date')
-version = GetOption('pack_version')
-
-def GetPackageVersion():
-    return '-'.join([version, pack_date, commit_id])
-
-# date-commitid
-def GetRevision():
-    return '-'.join([pack_date, commit_id])
 
 # https://www.gnu.org/software/autoconf/manual/autoconf-2.64/html_node/Standard-Symbols.html#Standard-Symbols
 # 5.1.1 Standard Symbols
@@ -179,12 +133,9 @@ syslibs = list()
 mylibs = list()
 files = list()
 
-release = GetOption("release")
 if plat == 'win32':
     # https://docs.microsoft.com/en-us/cpp/build/reference/mp-build-with-multiple-processes?view=msvc-140
     cppflags = ['/W3', '/Z7', '/MT']
-    if release:
-        cppflags += ['/O2']
     linkflags = ['/LTCG', '/IGNORE:4099']
     cppdefines = ['_WIN32', 'WIN32', 'WINNT', '_WINDOWS', 'NDEBUG', 'ENABLE_ZLIB','ENABLE_OPENSSL']
     cpppath = ['c:/developer/apr-dist/include', 'c:/developer/flow/include', 'c:/developer/libiconv-dist/include']
@@ -216,24 +167,19 @@ if plat == 'win32':
         cppdefines += ['_WIN32_WINNT=0x0600']
 else:
     env = Environment()
+    cppdefines = ['HAVE_CONFIG_H', '_REENTRANT', '_GNU_SOURCE', 'PIC', 'HAVE_SSL_H', 'HAVE_ZLIB_H']
+    cpppath = ['/usr/local/eoitek/include']
+    libpath = ['.', '/usr/local/eoitek/lib']
     cppflags = ['-g', '-fPIC']
-    libpath += ['.']
     if plat == 'linux':
         # Dwarf Error: wrong version in compilation unit header (is 5, should be 2, 3, or 4)
         cppflags += ['-gdwarf-4', '-gstrict-dwarf']
-    if release:
-        cppflags += ['-O2']
-    cppdefines = ['HAVE_CONFIG_H', '_REENTRANT', '_GNU_SOURCE', 'PIC', 'ENABLE_ARCHIVE', 'ENABLE_OPENSSL', 'ENABLE_ZLIB']
     if plat == 'aix':
-        pass
-        #syslibs = ['z', 'pthread', 'ssl', 'crypto']
-        # On AIX 6.1, prefer system libraries if there are multiple copies of a library (for example, libiconv).
-        #libpath += ['/usr/local/lib', '/usr/lib']
+        syslibs = ['z', 'ssl', 'crypto']
     elif plat == 'hpux':
-        pass
-        #syslibs = ['pthread', 'ssl', 'crypto', 'rt', 'z']
+        syslibs = ['ssl', 'crypto', 'z']
     else:
-        #syslibs = [':libz.a.a', 'pthread', 'ssl', 'crypto', 'rt', 'dl']
+        syslibs = [':libz.a.a', 'ssl', 'crypto']
         if plat == 'linux' and platform.processor() == 'i686':
             # https://stackoverflow.com/questions/22663897/unknown-type-name-off64-t
             cppdefines += ['_LARGEFILE64_SOURCE']

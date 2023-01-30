@@ -7,8 +7,15 @@
 ============================================================================*/
 static void lumberjack_config_normalize(lumberjack_client_t *self, lumberjack_config_t *config) {
     if (config == NULL) return;
+#ifndef HAVE_ZLIB_H
+    config->compress_level = 0;
+#endif
 
-    config->hosts = (config->hosts == NULL)? "127.0.0.1" :config->hosts;
+#ifndef HAVE_SSL_H
+    config->with_ssl = false;
+#endif
+
+    config->hosts = (config->hosts == NULL) ? "127.0.0.1" : config->hosts;
     if (config->with_ssl) {
         config->port = (config->port == 0)? LUMBERJACK_SSL_PORT_DEFAULT: config->port;
     } else {
@@ -125,16 +132,15 @@ static void lumberjack_build_header(lumberjack_config_t *config, lumberjack_head
     if (config->compress_level > 0) {
         header->compress[0] = config->protocol;
         header->compress[1] = LUMBERJACK_COMPRESS;
-    } else {
-        header->data[0] = config->protocol;
-        header->data[1] = (config->protocol == LUMBERJACK_PROTO_VERSION_V1) ? LUMBERJACK_DATA : LUMBERJACK_JSON;
     }
-
+    header->data[0] = config->protocol;
+    header->data[1] = (config->protocol == LUMBERJACK_PROTO_VERSION_V1) ? LUMBERJACK_DATA : LUMBERJACK_JSON;
+    
     header->ack[0] = config->protocol;
     header->ack[1] = LUMBERJACK_ACK;
 }
 
-int lumberjack_parse_ack(lumberjack_header_t *header, char *data, int len){
+static int lumberjack_parse_ack(lumberjack_header_t *header, char *data, int len){
     // 2A 
     int got_ack = -1;
     if (len >= 6 && memcmp(data, header->ack, 2) == 0) {
@@ -144,38 +150,92 @@ int lumberjack_parse_ack(lumberjack_header_t *header, char *data, int len){
     return got_ack;
 }
 
-void lumberjack_pack_message(lumberjack_client_t *self){
+static void lumberjack_compress_deflate(lumberjack_client_t *self, char *data, int len) {
+#ifdef HAVE_ZLIB_H
+    int ret;
+    z_stream strm;
+    unsigned char output[LUMBERJACK_CHUNK];
+    int sp;
+    int payload_size = 0;
+    char *compressed = NULL;
+
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    deflateInit(&strm, self->config->compress_level);
+    strm.next_in = data;
+    strm.avail_in = len;
+
+    do
+    {
+        strm.avail_out = LUMBERJACK_CHUNK;
+        strm.next_out = output;
+        ret = deflate(&strm, Z_FINISH);
+        //printf("ret:%d, strm.avail_out:%d, strm.avail_in: %d\n", ret, strm.avail_out, strm.avail_in);
+        if (ret == Z_STREAM_ERROR)
+        {
+            break;
+        }
+        sp = payload_size;
+        payload_size += (LUMBERJACK_CHUNK - strm.avail_out);
+        compressed = realloc(compressed, payload_size);
+        memcpy(compressed + sp, output, LUMBERJACK_CHUNK - strm.avail_out);
+    }
+    while (strm.avail_out == 0)
+        ;
+
+    deflateEnd(&strm);
+    // 2C + payload_size(bigendian)
+    self->data->size += (2 + sizeof(int) + payload_size);
+    self->data->data = realloc(self->data->data, self->data->size);
+    memcpy(self->data->data + 2 + sizeof(int), self->header->compress, 2);
+    int compress_size = htonl(payload_size);
+    memcpy(self->data->data + 4 + sizeof(int), &compress_size, sizeof(int));
+    memcpy(self->data->data + 4 + 2 * sizeof(int), compressed, payload_size);
+    _FREE(compressed);
+#endif
+}
+
+
+static void lumberjack_pack_message(lumberjack_client_t *self){
     int i, size = 0;
     char *single_data = NULL;
     char *data = NULL;
     int wsize = htonl(self->data->wsize);
-    self->data->data = calloc(1, 2 + sizeof(int));
+    self->data->size = 2 + sizeof(int);
+    self->data->data = calloc(1, self->data->size);
+    // 2W + window_size(bigendian)
     memcpy(self->data->data, self->header->window, 2);
-    memcpy(self->data->data + 2, (char *)&(wsize), sizeof(int));
+    memcpy(self->data->data + 2, &(wsize), sizeof(int));
     for (i = 0; i < self->data->wsize; i++){
+        // 2J + seq(bigendian) + payload_length(bigendian)
         int n = 2 + 2 * sizeof(int) + strlen(self->data->message[i]);
         int len = htonl(strlen(self->data->message[i]));
         int seq = htonl(i + 1);
         size += n;
         single_data = calloc(1, n);
         memcpy(single_data, self->header->data, 2);
-        memcpy(single_data + 2, (char *)&seq, sizeof(int));
-        memcpy(single_data + 2 + sizeof(int), (char *)&len, sizeof(int));
+        memcpy(single_data + 2, &seq, sizeof(int));
+        memcpy(single_data + 2 + sizeof(int), &len, sizeof(int));
         memcpy(single_data + 2 + 2 * sizeof(int), self->data->message[i], strlen(self->data->message[i]));
         data = realloc(data, size);
         memcpy(data + size - n, single_data, n);
         _FREE(single_data);
     }
-    if (self->config->compress_level == 0) {
-        self->data->data = realloc(self->data->data, 2 + sizeof(int) + size);
+
+    if (self->config->compress_level > 0) {
+        //utils_dump_hex(data, size);
+        lumberjack_compress_deflate(self, data, size);
+    } else {
+        self->data->size += size;
+        self->data->data = realloc(self->data->data, self->data->size);
         memcpy(self->data->data + 2 + sizeof(int), data, size);
-        self->data->size = size + 2 + sizeof(int);
-        _FREE(data);
     }
+    _FREE(data);
 }
 
 
-void lumberjack_reset_message(lumberjack_client_t *self){
+static void lumberjack_reset_message(lumberjack_client_t *self){
     if (self->data->data) {
         _FREE(self->data->data);
         self->data->size = 0;
@@ -312,10 +372,9 @@ unsigned int on_wait_and_ack(lumberjack_client_t *self){
     char buffer[16] = {0};
 RETRY:
     nbytes = recv(self->conn.sock, buffer,  16, 0);
+    //printf("nbytes: %d, buffer: %s\n", nbytes, buffer);
     if (nbytes < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // printf("errno: %d\n", errno);
-            // perror("recv");
             goto RETRY;
         } else {
             self->conn.sock_status = SS_DISCONNECT;

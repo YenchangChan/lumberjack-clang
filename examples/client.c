@@ -13,12 +13,12 @@ int main(void){
     lumberjack_config_t config  = {
         .hosts = "192.168.110.8",
         .port  = 7070,
-        .compress_level =  0,
+        .compress_level =  3,
         .client_port_range = "60000,60100",
         .bandwidth = 0,
         .protocol = LUMBERJACK_PROTO_VERSION_V2,
         .timeout = 10,
-        .batch = 1000,
+        .batch = 200,
     };
 
     lumberjack_metrics_t metrics = {
@@ -49,7 +49,7 @@ int main(void){
         }
         if (client->is_connected(client))
         {
-            char *msg  = "{\"@topic\":\"dc_test\",\"@message\":\"hello  world\"}";
+            char *msg  = "{\"@message\":\"hello world\",\"@@id\":\"8f440041835117afc302a47965be727a\",\"@filehashkey\":\"c0419d1e720f6256fd44da6dbdacf5f7\",\"@collectiontime\":\"2023-01-31T09:59:13.827+08:00\",\"@hostname\":\"ck08\",\"@path\":\"/root/chenyc/test/dc/mave/probes/itoa-flow/data/utf-8.log\",\"@rownumber\":1,\"@seq\":1,\"@topic\":\"dc_test\",\"@ip\":\"192.168.110.8\",\"@taskid\":\"5961086096158208\"}";
             int i = 0;
             for (i = 0; i < client->config->batch; i++) {
                 if (client->push(client, msg) == false){
@@ -66,10 +66,12 @@ int main(void){
                 int ack = client->wait_and_ack(client);
                 metrics.ack_lines += ack;
                 metrics.send_bytes += n;
+                //printf("got ack: %d\n", ack);
             }
         }
+
     }
-    
+
     if (client) {
         client->stop(client);
         client = NULL;

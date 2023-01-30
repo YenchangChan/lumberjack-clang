@@ -10,7 +10,7 @@ typedef int boolean;
 #define false 0
 
 #define LUMBERJACK_HOSTS_SIZE               128
-
+#define LUMBERJACK_CHUNK                    2048
 
 #define LUMBERJACK_BATCH_DEFAULT            300
 #define LUMBERJACK_PORT_DEFAULT             7070

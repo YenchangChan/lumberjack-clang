@@ -65,3 +65,35 @@ void utils_sleep(int64_t t) {
     Sleep(DWORD)(t / 1000);
 #endif
 }
+
+void utils_dump_hex(char *str, int len) {
+    int i = 0;
+    for (i = 0; i < len; i += 16)
+    {
+        int j = 0;
+        int k = i;
+        printf("%07x: ", i);
+        for (j = 0; j < 16; j++)
+        {
+            if (k >= len) {
+                printf("   ");
+            } else {
+                printf("%02x ", str[k++]);
+            }
+        }
+        printf("   ");
+        k = i;
+        for (j = 0; j < 16; j++)
+        {
+            if (k >= len) {
+                break;
+            }
+            if (str[k] > 31 && str[k] < 127){
+                printf("%c", str[k++]);
+            }else {
+                printf(".", str[k++]);
+            }
+        }
+        printf("\n");
+    }
+}
