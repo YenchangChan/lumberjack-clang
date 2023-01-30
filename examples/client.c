@@ -20,7 +20,8 @@ int main(void){
         if (client->is_connected(client)) {
             printf("client connected\n");
             char *msg  = "{\"@topic\":\"dc-test\",\"@message\":\"hello  world\"}";
-            for (unsigned int i = 0; i < client->config->batch; i++) {
+            int i = 0;
+            for (i = 0; i < client->config->batch; i++) {
                 if (client->push(client, msg)){
                     printf("send message[%u]: %s\n", i, msg);
                 } else {

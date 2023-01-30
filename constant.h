@@ -1,7 +1,6 @@
 #ifndef LUMBERJACK_CONSTANT_H_
 #define LUMBERJACK_CONSTANT_H_
 
-#include <sys/types.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,12 +31,6 @@ typedef int boolean;
 #define LUMBERJACK_COMPRESS       '\x43'       // 'C'
 #define LUMBERJACK_JSON           '\x4a'       // 'J'
 #define LUMBERJACK_DATA           '\x44'       // 'D'
-
-#ifdef _WIN32
-typefef _int64 int64_t; 
-#else 
-typedef __int64_t int64_t;
-#endif
 
 
 #define _FREE(v)    if (v != NULL) {     \

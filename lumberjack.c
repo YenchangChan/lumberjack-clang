@@ -1,7 +1,6 @@
 #include "constant.h"
 #include "utils.h"
 #include "lumberjack.h"
-#include <sys/types.h>
 
 /* =========================================================================
  configuration
@@ -20,6 +19,7 @@ static void lumberjack_config_normalize(lumberjack_client_t *self, lumberjack_co
 
     if (config->client_port_range) {
         char *ports[2];
+        int i = 0;
         int num = utils_string_split(config->client_port_range, ports, ",");
         config->_client_port_enable = (num == 2);
         if (config->_client_port_enable){
@@ -31,7 +31,7 @@ static void lumberjack_config_normalize(lumberjack_client_t *self, lumberjack_co
             config->_client_port_end = (end > LUMBERJACK_MAX_PORT) ? LUMBERJACK_MAX_PORT : end;
             config->_client_port_enable = (config->_client_port_start < config->_client_port_end);
         }
-        for ( int i = 0; i < num; i++) {
+        for (i = 0; i < num; i++) {
             _FREE(ports[i]);
         }
     }
@@ -178,7 +178,8 @@ void lumberjack_reset_message(lumberjack_client_t *self){
         _FREE(self->data->data);
         self->data->size = 0;
     }
-    for (int i = 0; i < self->data->wsize; i++) {
+    int i = 0;
+    for (i = 0; i < self->data->wsize; i++) {
         self->data->message[i] = NULL;
     }
     self->data->wsize = 0;
@@ -327,9 +328,7 @@ static void on_stop(lumberjack_client_t *self){
 
     int i  = 0;
     for(i = 0; i <  self->host_len;  i++)  {
-        if (self->hosts[i])  {
-            _FREE(self->hosts[i]);
-        }
+        _FREE(self->hosts[i]);
     }
     _FREE(self->config->hosts);
     _FREE(self->config);

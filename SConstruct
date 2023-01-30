@@ -249,7 +249,7 @@ env.StaticLibrary('lumberjack', lib_sources)
 
 env.Program('client', ['examples/client.c'], LIBS=['lumberjack'] + syslibs)
 
-files += 'liblumberjack.a'
+files += ['liblumberjack.a']
 
 if GetOption('clean'):
     extras = ['VERSION', 'client.exp', 'client.lib', '.sconsign.dblite', 'vc140.pdb', 'client.ilk']
@@ -258,7 +258,7 @@ if GetOption('clean'):
     if os.path.exists(prefix):
         shutil.rmtree(prefix)
 elif not GetOption('help'):
-    pass
-    # env.Install(prefix + "/include/lumberjack", ['lumberjack.h', 'constants.h', 'utils.h'])
-    # env.Install(prefix + "/lib/lumberjack", files)
+    includes = ['lumberjack.h', 'constant.h', 'utils.h']
+    env.Install(prefix + "/include/lumberjack", includes)
+    env.Install(prefix + "/lib/lumberjack", files)
 
