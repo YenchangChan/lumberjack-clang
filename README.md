@@ -10,6 +10,7 @@
 - batch如何发送？ // 已解决
 - 支持跨平台  //先基于Linux实现一把
 - 验证一把性能，极限能跑到多少
+    - 50w/s, 30M/s
 - cmake // done
     - 不是每个平台都支持cmake，是否要支持scons或者configure？  //done
     - 研究一下scons安装库  // done

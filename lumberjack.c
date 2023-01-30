@@ -149,25 +149,27 @@ void lumberjack_pack_message(lumberjack_client_t *self){
     char *single_data = NULL;
     char *data = NULL;
     int wsize = htonl(self->data->wsize);
-    self->data->data = calloc(1, 6);
+    self->data->data = calloc(1, 2 + sizeof(int));
     memcpy(self->data->data, self->header->window, 2);
     memcpy(self->data->data + 2, (char *)&(wsize), sizeof(int));
     for (i = 0; i < self->data->wsize; i++){
-        int n = 6 + strlen(self->data->message[i]);
+        int n = 2 + 2 * sizeof(int) + strlen(self->data->message[i]);
+        int len = htonl(strlen(self->data->message[i]));
         int seq = htonl(i + 1);
         size += n;
         single_data = calloc(1, n);
         memcpy(single_data, self->header->data, 2);
         memcpy(single_data + 2, (char *)&seq, sizeof(int));
-        memcpy(single_data + 6, self->data->message[i], strlen(self->data->message[i]));
+        memcpy(single_data + 2 + sizeof(int), (char *)&len, sizeof(int));
+        memcpy(single_data + 2 + 2 * sizeof(int), self->data->message[i], strlen(self->data->message[i]));
         data = realloc(data, size);
         memcpy(data + size - n, single_data, n);
         _FREE(single_data);
     }
     if (self->config->compress_level == 0) {
-        self->data->data = realloc(self->data->data, 6 + size);
-        memcpy(self->data->data + 6, data, size);
-        self->data->size = size;
+        self->data->data = realloc(self->data->data, 2 + sizeof(int) + size);
+        memcpy(self->data->data + 2 + sizeof(int), data, size);
+        self->data->size = size + 2 + sizeof(int);
         _FREE(data);
     }
 }
@@ -276,11 +278,11 @@ static int on_send(lumberjack_client_t *self){
         int n = 0;
         time_t before = utils_time_now();
         if (self->config->bandwidth > 0) {
-            n = (self->data->size > self->config->bandwidth) ? self->config->bandwidth : self->data->size;
+            n = (self->data->size - has_sended > self->config->bandwidth) ? self->config->bandwidth : self->data->size - has_sended;
         } else {
-            n = self->data->size;
+            n = self->data->size - has_sended;
         }
-        int nbytes = send(self->conn.sock, self->data->data, n, 0);
+        int nbytes = send(self->conn.sock, self->data->data + has_sended, n, 0);
         if (nbytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 nbytes  =  0;
@@ -291,7 +293,6 @@ static int on_send(lumberjack_client_t *self){
             }
         }
         has_sended += nbytes;
-        printf("haas_sended: %u, size: %u\n", has_sended, self->data->size);
         if (self->config->bandwidth > 0 && has_sended < self->data->size) {
             time_t now = utils_time_now();    
             if (now - before > 0) {
@@ -307,11 +308,15 @@ unsigned int on_wait_and_ack(lumberjack_client_t *self){
     if (self->is_connected(self) == false) {
         return 0;
     }
-    char buffer[1024];
-    int nbytes = recv(self->conn.sock, buffer,  1024, 0);
+    int nbytes = 0;
+    char buffer[16] = {0};
+RETRY:
+    nbytes = recv(self->conn.sock, buffer,  16, 0);
     if (nbytes < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return 0;
+            // printf("errno: %d\n", errno);
+            // perror("recv");
+            goto RETRY;
         } else {
             self->conn.sock_status = SS_DISCONNECT;
             close(self->conn.sock);
