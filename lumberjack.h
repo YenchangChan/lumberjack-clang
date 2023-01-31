@@ -24,6 +24,11 @@ extern "C" {
 #include <zlib.h>
 #endif
 
+#ifdef HAVE_SSL_H
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
+
 #include "constant.h"
 
 typedef struct lumberjack_config_t {
@@ -49,15 +54,23 @@ typedef union lumberjack_address_t {
     struct sockaddr_in6 v6;         // ipv6
 }lumberjack_address_t;
 
-typedef struct lumberjack_connnect_t {
+typedef struct lumberjack_connect_t {
     char                    *host;
     int                     port;
     lumberjack_address_t    addr;
     int                     domain;
+#ifndef _WIN32
     int                     sock;
+#else
+    SOCKET                  sock;
+#endif
     int                     sock_status;
     boolean                 is_ipv6;
-}lumberjack_connnect_t;
+#ifdef HAVE_SSL_H
+    SSL                     *ssl_handle;
+    SSL_CTX                 *ssl_ctx;
+#endif
+}lumberjack_connect_t;
 
 
 typedef struct lumberjack_data_t {
@@ -98,7 +111,7 @@ typedef struct lumberjack_client_t {
 
     /*-------------------------------------------------*/
     lumberjack_config_t *config;
-    lumberjack_connnect_t  conn;
+    lumberjack_connect_t  conn;
     char *hosts[LUMBERJACK_HOSTS_SIZE];
     int host_len;
     lumberjack_header_t *header;

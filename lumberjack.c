@@ -7,13 +7,6 @@
 ============================================================================*/
 static void lumberjack_config_normalize(lumberjack_client_t *self, lumberjack_config_t *config) {
     if (config == NULL) return;
-#ifndef HAVE_ZLIB_H
-    config->compress_level = 0;
-#endif
-
-#ifndef HAVE_SSL_H
-    config->with_ssl = false;
-#endif
 
     config->hosts = (config->hosts == NULL) ? "127.0.0.1" : config->hosts;
     if (config->with_ssl) {
@@ -122,6 +115,54 @@ static void lumberjack_repick_host(lumberjack_client_t *self) {
     self->conn.domain = self->conn.is_ipv6 ? AF_INET6 : AF_INET;
 }
 
+/* =========================================================================
+ ssl
+============================================================================*/
+#ifdef HAVE_SSL_H
+void lumberjack_ssl_connect(lumberjack_connect_t *conn) {
+    conn->ssl_handle = NULL;
+    conn->ssl_ctx = NULL;
+
+    if (conn->sock) {
+        SSL_load_error_strings();
+        SSL_library_init();
+        OpenSSL_add_all_algorithms();
+
+        conn->ssl_ctx = SSL_CTX_new(TLSv1_2_method());
+        if (conn->ssl_ctx == NULL) {
+            ERR_print_errors_fp(stderr);
+        }
+
+        conn->ssl_handle = SSL_new(conn->ssl_ctx);
+        if (conn->ssl_handle == NULL) {
+            ERR_print_errors_fp(stderr);
+        }
+
+        if (!SSL_set_fd(conn->ssl_handle, conn->sock)) {
+            ERR_print_errors_fp(stderr);
+        }
+        if (SSL_connect(conn->ssl_handle) != 1) {
+            ERR_print_errors_fp(stderr);
+        }
+        printf("ssl connection established\n");
+    } else {
+        printf("ssl connection failed\n");
+    }
+}
+
+void lumberjack_ssl_disconnect(lumberjack_connect_t *conn)
+{
+    if (conn->ssl_handle) {
+        SSL_shutdown(conn->ssl_handle);
+        SSL_free(conn->ssl_handle);
+    }
+
+    if (conn->ssl_ctx) {
+        SSL_CTX_free(conn->ssl_ctx);
+    }
+}
+
+#endif
 /* =========================================================================
  protocol
 ============================================================================*/
@@ -262,6 +303,13 @@ static boolean on_is_connected(lumberjack_client_t *self){
                 rv = connect(self->conn.sock, (struct sockaddr*)&self->conn.addr.v4, sizeof(self->conn.addr.v4));
             }
             if (rv ==  0 || errno == EISCONN){
+                self->conn.sock_status = SS_CONNECTED;
+#ifdef HAVE_SSL_H
+                if (self->config->with_ssl)
+                {
+                    lumberjack_ssl_connect(&(self->conn));
+                }
+#endif
                 return true;
             }
             break;
@@ -272,6 +320,11 @@ static boolean on_is_connected(lumberjack_client_t *self){
     }
     
     //should reconnect
+#ifdef HAVE_SSL_H
+    if (self->config->with_ssl) {
+        lumberjack_ssl_disconnect(&(self->conn));
+    }
+#endif
     lumberjack_repick_host(self);
     self->conn.sock_status = SS_DISCONNECT;
     self->start(self);
@@ -311,6 +364,11 @@ static void on_start(struct lumberjack_client_t *self){
     }
     if (rv == 0) {
         self->conn.sock_status = SS_CONNECTED;
+#ifdef HAVE_SSL_H
+        if (self->config->with_ssl) {
+            lumberjack_ssl_connect(&(self->conn));
+        }
+#endif
         return;
     } else {
         if (errno == EINPROGRESS) {
@@ -342,13 +400,25 @@ static int on_send(lumberjack_client_t *self){
         } else {
             n = self->data->size - has_sended;
         }
-        int nbytes = send(self->conn.sock, self->data->data + has_sended, n, 0);
+        int nbytes = 0;
+        if (self->config->with_ssl) {
+#ifdef HAVE_SSL_H
+            nbytes = SSL_write(self->conn.ssl_handle, self->data->data + has_sended, n);
+#endif
+        } else {
+            nbytes = send(self->conn.sock, self->data->data + has_sended, n, 0);
+        }
         if (nbytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 nbytes  =  0;
             } else {
                 self->conn.sock_status = SS_DISCONNECT;
                 close(self->conn.sock);
+#ifdef HAVE_SSL_H
+                if (self->config->with_ssl) {
+                    lumberjack_ssl_disconnect(&(self->conn));
+                }
+#endif
                 break;
             }
         }
@@ -370,8 +440,22 @@ unsigned int on_wait_and_ack(lumberjack_client_t *self){
     }
     int nbytes = 0;
     char buffer[16] = {0};
+    int64_t now, before;
+    before = utils_time_now();
 RETRY:
-    nbytes = recv(self->conn.sock, buffer,  16, 0);
+    now = utils_time_now();
+    if (now - before >= self->config->timeout * 1e6) {
+        // timeout
+        return -1;
+    }
+
+    if (self->config->with_ssl) {
+#ifdef HAVE_SSL_H
+        nbytes = SSL_read(self->conn.ssl_handle, buffer, 16);
+#endif
+    } else {
+        nbytes = recv(self->conn.sock, buffer, 16, 0);
+    }
     //printf("nbytes: %d, buffer: %s\n", nbytes, buffer);
     if (nbytes < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -379,6 +463,11 @@ RETRY:
         } else {
             self->conn.sock_status = SS_DISCONNECT;
             close(self->conn.sock);
+#ifdef HAVE_SSL_H
+            if (self->config->with_ssl) {
+                lumberjack_ssl_disconnect(&(self->conn));
+            }
+#endif
         }
     }
 

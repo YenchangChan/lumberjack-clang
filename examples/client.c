@@ -19,6 +19,7 @@ int main(void){
         .protocol = LUMBERJACK_PROTO_VERSION_V2,
         .timeout = 10,
         .batch = 200,
+        .with_ssl = false,
     };
 
     lumberjack_metrics_t metrics = {
@@ -69,7 +70,6 @@ int main(void){
                 //printf("got ack: %d\n", ack);
             }
         }
-
     }
 
     if (client) {

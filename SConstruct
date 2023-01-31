@@ -179,7 +179,7 @@ else:
     elif plat == 'hpux':
         syslibs = ['ssl', 'crypto', 'z']
     else:
-        syslibs = [':libz.a.a', 'ssl', 'crypto']
+        syslibs = [':libz.a.a', 'ssl', 'crypto', 'rt', 'dl']
         if plat == 'linux' and platform.processor() == 'i686':
             # https://stackoverflow.com/questions/22663897/unknown-type-name-off64-t
             cppdefines += ['_LARGEFILE64_SOURCE']
