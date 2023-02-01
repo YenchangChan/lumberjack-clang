@@ -16,8 +16,10 @@ typedef int boolean;
 #define LUMBERJACK_PORT_DEFAULT             7070
 #define LUMBERJACK_SSL_PORT_DEFAULT         7443
 #define LUMBERJACK_COMPRESS_LEVEL_DEFAULT   0
+#define LUMBERJACK_TIMEOUT_DEFAULT          10
 #define LUMBERJACK_PROTO_VERSION_V1         '1'
 #define LUMBERJACK_PROTO_VERSION_V2         '2'
+#define LUMBERJACK_PROTO_VERSION_MIN        '2'
 
 #define SS_DISCONNECT  0
 #define SS_PENDING     1

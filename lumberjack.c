@@ -16,6 +16,9 @@ static void lumberjack_config_normalize(lumberjack_client_t *self, lumberjack_co
     }
     config->batch = (config->batch == 0)? LUMBERJACK_BATCH_DEFAULT:config->batch;
     config->protocol = (config->protocol == '\0') ? LUMBERJACK_PROTO_VERSION_V2 : config->protocol;
+    // only support v2
+    config->protocol = (config->protocol >= LUMBERJACK_PROTO_VERSION_MIN) ? LUMBERJACK_PROTO_VERSION_MIN : config->protocol;
+    config->timeout = (config->timeout == 0) ? LUMBERJACK_TIMEOUT_DEFAULT : config->timeout;
 
     if (config->client_port_range) {
         char *ports[2];
@@ -444,7 +447,7 @@ unsigned int on_wait_and_ack(lumberjack_client_t *self){
     before = utils_time_now();
 RETRY:
     now = utils_time_now();
-    if (now - before >= self->config->timeout * 1e6) {
+    if (self->config->timeout > 0 && now - before >= self->config->timeout * 1e6) {
         // timeout
         return -1;
     }

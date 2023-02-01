@@ -14,6 +14,7 @@ AC_LANG(C)
 AC_PROG_CC
 AC_PROG_CC_STDC
 AC_PROG_LIBTOOL
+AC_PROG_CXX
 
 # Checks for libraries.
 

@@ -1,12 +1,12 @@
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.22)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.17)
 
 PROJECT(lumberjack VERSION 0.1 LANGUAGES C CXX)
 
 ADD_SUBDIRECTORY(examples bin)
 
 SET(SRC_LIST lumberjack.c utils.c)
-SET(CXX_FORMAT_SIGNEDNESS "-Wformat-signedness")
+#SET(CXX_FORMAT_SIGNEDNESS "-Wformat-signedness")
 SET(CXX_FORMAT_SECURITY "-Werror=format-security")
 SET(CXX_STACK_PROTECTOR "-fstack-protector-all")
 SET(CXX_FLAGS_DEBUG "-O0")

@@ -171,15 +171,16 @@ else:
     cpppath = ['/usr/local/eoitek/include']
     libpath = ['.', '/usr/local/eoitek/lib']
     cppflags = ['-g', '-fPIC']
+    
     if plat == 'linux':
         # Dwarf Error: wrong version in compilation unit header (is 5, should be 2, 3, or 4)
         cppflags += ['-gdwarf-4', '-gstrict-dwarf']
     if plat == 'aix':
-        syslibs = ['z', 'ssl', 'crypto']
+        syslibs = ['z', 'ssl', 'crypto', 'rt', 'dl', 'pthread']
     elif plat == 'hpux':
         syslibs = ['ssl', 'crypto', 'z']
     else:
-        syslibs = [':libz.a.a', 'ssl', 'crypto', 'rt', 'dl']
+        syslibs = [':libz.a.a', 'ssl', 'crypto', 'rt', 'dl', 'pthread']
         if plat == 'linux' and platform.processor() == 'i686':
             # https://stackoverflow.com/questions/22663897/unknown-type-name-off64-t
             cppdefines += ['_LARGEFILE64_SOURCE']
@@ -193,7 +194,12 @@ lib_sources = 'lumberjack.c utils.c'.split()
 
 env.StaticLibrary('lumberjack', lib_sources)
 
-env.Program('client', ['examples/client.c'], LIBS=['lumberjack'] + syslibs)
+env.Program('client', ['examples/client.c', 'examples/metric.c'], LIBS=['lumberjack'] + syslibs)
+
+if plat != 'hpux':
+    cppflags += ['-std=c++11', '-pthread']
+    linkflags = ['-static-libgcc', '-static-libstdc++']
+    env.Program('client-cpp', ['examples/client_thread.cpp', 'examples/metric.c'], LIBS=['lumberjack'] + syslibs, LINKFLAGS=linkflags)
 
 files += ['liblumberjack.a']
 

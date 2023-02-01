@@ -13,8 +13,10 @@ install-sh
 ltmain.sh
 .sconsign.dblite
 .sconf_temp/
+config.h.in*
 
 *.o
 *.a
 *.so
 client
+client-cpp
