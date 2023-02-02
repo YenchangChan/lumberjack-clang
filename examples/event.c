@@ -35,12 +35,7 @@ int main(void)
 			char *msg = "{\"@message\":\"hello world\",\"@@id\":\"8f440041835117afc302a47965be727a\",\"@filehashkey\":\"c0419d1e720f6256fd44da6dbdacf5f7\",\"@collectiontime\":\"2023-01-31T09:59:13.827+08:00\",\"@hostname\":\"ck08\",\"@path\":\"/root/chenyc/test/dc/mave/probes/itoa-flow/data/utf-8.log\",\"@rownumber\":1,\"@seq\":1,\"@topic\":\"dc_test\",\"@ip\":\"192.168.110.8\",\"@taskid\":\"5961086096158208\"}";
 			while (client->push(client, msg))
 				;
-			int n = client->send(client);
-			if (n < 0)
-			{
-				printf("send message failed, n = %d\n", n);
-				break;
-			}
+			client->send(client);
 		} else if (event == LJ_EVENT_READ) {
 			int ack = client->wait_and_ack(client);
 			if (ack != client->config->batch) {

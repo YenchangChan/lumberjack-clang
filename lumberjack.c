@@ -125,7 +125,7 @@ static void lumberjack_repick_host(lumberjack_client_t *self) {
  ssl
 ============================================================================*/
 #ifdef HAVE_SSL_H
-boolean lumberjack_ssl_connect(lumberjack_connect_t *conn) {
+void lumberjack_ssl_connect(lumberjack_connect_t *conn) {
     conn->ssl_handle = NULL;
     conn->ssl_ctx = NULL;
 
@@ -137,28 +137,22 @@ boolean lumberjack_ssl_connect(lumberjack_connect_t *conn) {
         conn->ssl_ctx = SSL_CTX_new(TLSv1_2_method());
         if (conn->ssl_ctx == NULL) {
             ERR_print_errors_fp(stderr);
-            return false;
         }
 
         conn->ssl_handle = SSL_new(conn->ssl_ctx);
         if (conn->ssl_handle == NULL) {
             ERR_print_errors_fp(stderr);
-            return false;
         }
 
         if (!SSL_set_fd(conn->ssl_handle, conn->sock)) {
             ERR_print_errors_fp(stderr);
-            return false;
         }
         if (SSL_connect(conn->ssl_handle) != 1) {
             ERR_print_errors_fp(stderr);
-            return false;
         }
         printf("ssl connection established\n");
-        return true;
     } else {
         printf("ssl connection failed\n");
-        return false;
     }
 }
 
@@ -361,9 +355,7 @@ static boolean on_is_connected(lumberjack_client_t *self){
 #ifdef HAVE_SSL_H
                 if (self->config->with_ssl)
                 {
-                    if (lumberjack_ssl_connect(&(self->conn)) == false) {
-                        break;
-                    }
+                    lumberjack_ssl_connect(&self->conn);
                 }
 #endif
                 FD_ZERO(&self->conn.readfds);
@@ -398,6 +390,7 @@ static void on_start(struct lumberjack_client_t *self){
         close(self->conn.sock);
     }
     int rv = -1;
+    printf("choose host %s:%d to connect\n", self->conn.host, self->conn.port);
     self->conn.sock = socket(self->conn.domain, SOCK_STREAM, 0);
     if (self->conn.sock == -1){
         return;
@@ -427,10 +420,9 @@ static void on_start(struct lumberjack_client_t *self){
     }
     if (rv == 0) {   
 #ifdef HAVE_SSL_H
-        if (self->config->with_ssl) {
-            if (lumberjack_ssl_connect(&(self->conn)) == false) {
-                return;
-            }
+        if (self->config->with_ssl)
+        {
+            lumberjack_ssl_connect(&self->conn);
         }
 #endif
         FD_ZERO(&self->conn.readfds);
@@ -525,12 +517,13 @@ static int on_send(lumberjack_client_t *self){
             nbytes  =  0;
         } else {
             self->conn.sock_status = SS_DISCONNECT;
-            close(self->conn.sock);
+            
 #ifdef HAVE_SSL_H
             if (self->config->with_ssl) {
                 lumberjack_ssl_disconnect(&(self->conn));
             }
 #endif
+            close(self->conn.sock);
             lumberjack_unlock(self->mutex);
             return nbytes;
         }
@@ -588,12 +581,12 @@ RETRY:
             goto RETRY;
         } else {
             self->conn.sock_status = SS_DISCONNECT;
-            close(self->conn.sock);
 #ifdef HAVE_SSL_H
             if (self->config->with_ssl) {
                 lumberjack_ssl_disconnect(&(self->conn));
             }
 #endif
+            close(self->conn.sock);
         }
     }
 
@@ -608,7 +601,9 @@ RETRY:
 
 static void on_stop(lumberjack_client_t *self){
     // 如果没有发完，要发完为止 
-    pthread_join(self->worker_thread, NULL);
+    if (self->worker_thread > 0) {
+        pthread_join(self->worker_thread, NULL);
+    }
     if (self->conn.sock > 0){
         close(self->conn.sock);
     }
