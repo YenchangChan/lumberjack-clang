@@ -91,9 +91,24 @@ void utils_dump_hex(char *str, int len) {
             if (str[k] > 31 && str[k] < 127){
                 printf("%c", str[k++]);
             }else {
-                printf(".", str[k++]);
+                printf(".");
+                k++;
             }
         }
         printf("\n");
     }
+}
+
+char * utils_fmt_size(int64_t size) {
+    static char buff[32] = {0};
+    if (size < KB) {
+        sprintf(buff, "%g B", size);
+    } else if (size < MB) {
+        sprintf(buff, "%g KB", size/(KB*1.0));
+    } else if (size < GB){
+        sprintf(buff, "%g MB", size / (MB * 1.0));
+    } else {
+        sprintf(buff, "%g GB", size / (GB * 1.0));
+    }
+    return buff;
 }

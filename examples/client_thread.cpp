@@ -1,5 +1,4 @@
 #include "../lumberjack.h"
-#include "metric.h"
 #include <iostream>
 #include <string>
 #include <thread>
@@ -10,8 +9,7 @@ int main() {
 	config.hosts = (char *)"192.168.110.8";
 	std::mutex mtx;
 
-	lumberjack_metrics_t *metrics = metrics_init(5);
-	lumberjack_client_t *client = lumberjack_new_client(&config);
+	lumberjack_client_t *client = lumberjack_new_client(NULL, &config);
 
 	std::cout <<"client created " << client->conn.host << ":" << client->conn.port << std::endl;
 	client->start(client);
@@ -19,18 +17,14 @@ int main() {
 	std::thread thd = std::thread([&]{
 		while(1) {
 			int ack = client->wait_and_ack(client);
-			{
-				std::lock_guard<std::mutex> lk(mtx);
-				metrics_add_lines(metrics, ack);
-				metrics_add_bytes(metrics, client->data->size);
-			};
+			//printf("got ack: %d\n", ack);
 		}
 	});
 	while (1)
 	{
 		{
 			std::lock_guard<std::mutex> lk(mtx);
-			metrics_print(metrics);
+			client->metrics_report(client);
 		}
 		if (client->is_connected(client))
 		{
@@ -62,6 +56,5 @@ int main() {
 	if (thd.joinable()) {
 		thd.join();
 	}
-	metrics_destroy(metrics);
 	return 0;
 }

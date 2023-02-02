@@ -31,13 +31,7 @@
     - cmake //done  
     - configure //done
     - scons //done
-- 异步优化： 改成epoll？
-
-## 待完成
-- C++使用线程去接受ack后，反而效率下降了，一开始很高，后面越来越慢 （计划0.5d）
-- cmake和configure的zlib，ssl库添加， cpp编译 （计划0.5d， 只考虑Linux，还是以scons为主）
-- 异步优化，unix使用epoll，Windows使用iocp？ （3d）
-- 跨平台支持，Linux问题不大
-    - aix （0.5d）
-    - hpux （0.5d）
-    - Windows （2d）
+- 问题：
+    - 极限性能在25w左右，还是不太能达到要求
+    - 开启多线程，一个push，一个发和收的话，会经常性出现 akc mismatch
+    - ssl 会core掉

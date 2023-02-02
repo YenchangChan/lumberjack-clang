@@ -109,13 +109,13 @@ liblumberjack_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	-o $@
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_client_OBJECTS = client.$(OBJEXT) metric.$(OBJEXT)
+am_client_OBJECTS = client.$(OBJEXT)
 client_OBJECTS = $(am_client_OBJECTS)
 client_DEPENDENCIES = $(top_builddir)/liblumberjack.la
 client_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(client_LDFLAGS) $(LDFLAGS) -o $@
-am_client_cpp_OBJECTS = client_thread.$(OBJEXT) metric.$(OBJEXT)
+am_client_cpp_OBJECTS = client_thread.$(OBJEXT)
 client_cpp_OBJECTS = $(am_client_cpp_OBJECTS)
 client_cpp_DEPENDENCIES = $(top_builddir)/liblumberjack.la
 client_cpp_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
@@ -260,7 +260,9 @@ LD = @LD@
 LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBSSL = @LIBSSL@
 LIBTOOL = @LIBTOOL@
+LIBZLIB = @LIBZLIB@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
@@ -343,10 +345,10 @@ top_srcdir = @top_srcdir@
 noinst_LTLIBRARIES = liblumberjack.la
 liblumberjack_la_LDFLAGS = -all-static
 liblumberjack_la_SOURCES = lumberjack.c utils.c
-client_SOURCES = examples/client.c examples/metric.c
+client_SOURCES = examples/client.c 
 client_LDADD = $(top_builddir)/liblumberjack.la
 client_LDFLAGS = -all-static
-client_cpp_SOURCES = examples/client_thread.cpp examples/metric.c
+client_cpp_SOURCES = examples/client_thread.cpp
 client_cpp_LDADD = $(top_builddir)/liblumberjack.la
 client_cpp_LDFLAGS = -all-static -std=c++11
 all: config.h
@@ -484,7 +486,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/client.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/client_thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lumberjack.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/metric.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Plo@am__quote@
 
 .c.o:
@@ -521,20 +522,6 @@ client.obj: examples/client.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='examples/client.c' object='client.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o client.obj `if test -f 'examples/client.c'; then $(CYGPATH_W) 'examples/client.c'; else $(CYGPATH_W) '$(srcdir)/examples/client.c'; fi`
-
-metric.o: examples/metric.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT metric.o -MD -MP -MF $(DEPDIR)/metric.Tpo -c -o metric.o `test -f 'examples/metric.c' || echo '$(srcdir)/'`examples/metric.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/metric.Tpo $(DEPDIR)/metric.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='examples/metric.c' object='metric.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o metric.o `test -f 'examples/metric.c' || echo '$(srcdir)/'`examples/metric.c
-
-metric.obj: examples/metric.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT metric.obj -MD -MP -MF $(DEPDIR)/metric.Tpo -c -o metric.obj `if test -f 'examples/metric.c'; then $(CYGPATH_W) 'examples/metric.c'; else $(CYGPATH_W) '$(srcdir)/examples/metric.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/metric.Tpo $(DEPDIR)/metric.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='examples/metric.c' object='metric.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o metric.obj `if test -f 'examples/metric.c'; then $(CYGPATH_W) 'examples/metric.c'; else $(CYGPATH_W) '$(srcdir)/examples/metric.c'; fi`
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

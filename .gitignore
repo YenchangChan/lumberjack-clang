@@ -20,3 +20,5 @@ config.h.in*
 *.so
 client
 client-cpp
+boot
+event

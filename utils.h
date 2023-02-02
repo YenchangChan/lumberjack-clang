@@ -23,6 +23,7 @@ boolean utils_is_ipv6_address(char *address);
 int64_t utils_time_now();
 void utils_sleep(int64_t t);
 void utils_dump_hex(char *str, int len);
+char *utils_fmt_size(int64_t size);
 
 #ifdef __cplusplus
 }

@@ -34,6 +34,23 @@ typedef int boolean;
 #define LUMBERJACK_JSON           '\x4a'       // 'J'
 #define LUMBERJACK_DATA           '\x44'       // 'D'
 
+#define LUMBERJACK_METRIC_INTERVAL_DEFAULT      30
+#define LUMBERJACK_METRIC_NAME_DEFAULT          "lumberjack_metrics"
+
+#define LJ_EVENT_ERROR          -1
+#define LJ_EVENT_NONE            0
+#define LJ_EVENT_READ            1
+#define LJ_EVENT_WRITE           2
+
+#define LJ_STATUS_INIT           0
+#define LJ_STATUS_START          1
+#define LJ_STATUS_STOP           2
+#define LJ_STATUS_ACK_MISMATCH          3
+#define LJ_STATUS_FAILED         -1
+
+#define KB  (1 << 10)
+#define MB  (1 << 20)
+#define GB  (1 << 30)
 
 #define _FREE(v)    if (v != NULL) {     \
                         free(v);         \

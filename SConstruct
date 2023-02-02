@@ -194,12 +194,13 @@ lib_sources = 'lumberjack.c utils.c'.split()
 
 env.StaticLibrary('lumberjack', lib_sources)
 
-env.Program('client', ['examples/client.c', 'examples/metric.c'], LIBS=['lumberjack'] + syslibs)
-
-if plat != 'hpux':
-    cppflags += ['-std=c++11', '-pthread']
-    linkflags = ['-static-libgcc', '-static-libstdc++']
-    env.Program('client-cpp', ['examples/client_thread.cpp', 'examples/metric.c'], LIBS=['lumberjack'] + syslibs, LINKFLAGS=linkflags)
+env.Program('client', ['examples/client.c'], LIBS=['lumberjack'] + syslibs)
+env.Program('event', ['examples/event.c'], LIBS=['lumberjack'] + syslibs)
+env.Program('boot', ['examples/boot.c'], LIBS=['lumberjack'] + syslibs)
+# if plat != 'hpux':
+    # cppflags += ['-std=c++11', '-pthread']
+    # linkflags = ['-static-libgcc', '-static-libstdc++']
+    # env.Program('client-cpp', ['examples/client_thread.cpp'], LIBS=['lumberjack'] + syslibs, LINKFLAGS=linkflags)
 
 files += ['liblumberjack.a']
 

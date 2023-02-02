@@ -12,10 +12,12 @@ extern "C" {
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+#include <pthread.h>
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <sys/select.h>
 #else
 #include <windows.h>
 #endif
@@ -41,7 +43,9 @@ typedef struct lumberjack_config_t {
     unsigned int        bandwidth;
     char                *client_port_range;
     int                 timeout;
-        
+    int                 metric_interval;
+    boolean             metric_enable;
+
     // externel variable
     boolean             _client_port_enable;
     int                 _client_port_start;
@@ -59,13 +63,15 @@ typedef struct lumberjack_connect_t {
     int                     port;
     lumberjack_address_t    addr;
     int                     domain;
+    int                     sock_status;
+    boolean                 is_ipv6;
 #ifndef _WIN32
     int                     sock;
+    fd_set                  readfds;
+    fd_set                  writefds;
 #else
     SOCKET                  sock;
 #endif
-    int                     sock_status;
-    boolean                 is_ipv6;
 #ifdef HAVE_SSL_H
     SSL                     *ssl_handle;
     SSL_CTX                 *ssl_ctx;
@@ -73,13 +79,17 @@ typedef struct lumberjack_connect_t {
 }lumberjack_connect_t;
 
 
+// data is each batch of messages
 typedef struct lumberjack_data_t {
     int             wsize; // real size
     int             cap;   // each batch size
-    char            **message;
+    char            **message; // array of message
     char            *data;
     unsigned int    size;
-}lumberjack_data_t;
+    unsigned int    has_sended;
+    boolean         sending;
+    int             expect_ack;
+} lumberjack_data_t;
 
 typedef struct lumberjack_header_t {
     char window[2];         // 2W
@@ -88,9 +98,24 @@ typedef struct lumberjack_header_t {
     char ack[2];            // 2A
 }lumberjack_header_t;
 
+typedef struct lumberjack_metrics_t {
+    char *metric_name;
+    time_t time;
+    uint64_t prev_lines;
+    uint64_t ack_lines;
+    uint64_t prev_bytes;
+    uint64_t send_bytes;
+    int interval;
+} lumberjack_metrics_t;
+
+typedef struct lumberjack_window_t {
+    time_t time;
+    int64_t count;
+    boolean batch_is_sending;
+} lumberjack_window_t;
 
 typedef struct lumberjack_client_t {
-    
+
     // start a connection to connect server
     void (*start)(struct lumberjack_client_t *self);
 
@@ -107,7 +132,16 @@ typedef struct lumberjack_client_t {
     unsigned int (*wait_and_ack)(struct lumberjack_client_t *self);
     
     // close the connection and free memory
-    void (*stop)(struct lumberjack_client_t *slef);
+    void (*stop)(struct lumberjack_client_t *self);
+
+    // report metrics to stdout
+    void (*metrics_report)(struct lumberjack_client_t *self);
+
+    int (*event_type)(struct lumberjack_client_t *self);
+
+    int (*bootstrap)(struct lumberjack_client_t *self);
+
+    int (*get_status)(struct lumberjack_client_t *self);
 
     /*-------------------------------------------------*/
     lumberjack_config_t *config;
@@ -116,9 +150,14 @@ typedef struct lumberjack_client_t {
     int host_len;
     lumberjack_header_t *header;
     lumberjack_data_t *data;
-}lumberjack_client_t;
+    lumberjack_metrics_t *metrics;
+    pthread_mutex_t mutex;
+    lumberjack_window_t window;
+    pthread_t worker_thread;
+    int status;
+} lumberjack_client_t;
 
-lumberjack_client_t *lumberjack_new_client(lumberjack_config_t *config);
+lumberjack_client_t *lumberjack_new_client(char *module_name, lumberjack_config_t *config);
 
 #ifdef __cplusplus
 }
