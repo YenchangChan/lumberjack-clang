@@ -5,9 +5,21 @@
 #include <mutex>
 
 int main() {
-	lumberjack_config_t config = {0};
-	config.hosts = (char *)"192.168.110.8";
-	std::mutex mtx;
+	// lumberjack_config_t config = {0};
+	// config.hosts = (char *)"192.168.110.8";
+	lumberjack_config_t config  = {
+        hosts 					: (char *)"192.168.110.8",
+        port  					: 7443,
+		batch 					: 200,
+		with_ssl 				: true,
+		protocol 				: LUMBERJACK_PROTO_VERSION_V2,
+        compress_level 			: 0,
+		bandwidth 				: 0,
+        client_port_range 		: (char *)"60000,60100",
+        timeout 				: 10,
+        metric_interval 		: 5,
+		metric_enable 			: true,
+    };
 
 	lumberjack_client_t *client = lumberjack_new_client(NULL, &config);
 
@@ -22,10 +34,7 @@ int main() {
 	});
 	while (1)
 	{
-		{
-			std::lock_guard<std::mutex> lk(mtx);
-			client->metrics_report(client);
-		}
+		client->metrics_report(client);
 		if (client->is_connected(client))
 		{
 			std::string msg = "{\"@message\":\"hello world\",\"@@id\":\"8f440041835117afc302a47965be727a\",\"@filehashkey\":\"c0419d1e720f6256fd44da6dbdacf5f7\",\"@collectiontime\":\"2023-01-31T09:59:13.827+08:00\",\"@hostname\":\"ck08\",\"@path\":\"/root/chenyc/test/dc/mave/probes/itoa-flow/data/utf-8.log\",\"@rownumber\":1,\"@seq\":1,\"@topic\":\"dc_test\",\"@ip\":\"192.168.110.8\",\"@taskid\":\"5961086096158208\"}";

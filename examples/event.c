@@ -3,17 +3,17 @@
 int main(void)
 {
 	lumberjack_config_t config = {
-		.hosts = "192.168.110.8",
-		.port = 7070,
-		.compress_level = 0,
-		.client_port_range = "60000,60100",
-		.bandwidth = 0,
-		.protocol = LUMBERJACK_PROTO_VERSION_V2,
-		.timeout = 10,
-		.batch = 1000,
-		.with_ssl = false,
-		.metric_interval = 5,
-		.metric_enable = true,
+		.hosts 					= "192.168.110.8",
+		.port 					= 7070,
+		.compress_level 		= 0,
+		.client_port_range 		= "60000,60100",
+		.bandwidth 				= 0,
+		.protocol 				= LUMBERJACK_PROTO_VERSION_V2,
+		.timeout 				= 10,
+		.batch 					= 1000,
+		.with_ssl 				= false,
+		.metric_interval 		= 5,
+		.metric_enable 			= true,
 	};
 	// lumberjack_config_t config = {0};
 	lumberjack_client_t *client = lumberjack_new_client(NULL, &config);
@@ -23,9 +23,7 @@ int main(void)
 
 	while (1)
 	{
-		if (client->config->metric_enable) {
-			client->metrics_report(client);
-		}
+		client->metrics_report(client);
 		int event = client->event_type(client);
 		if (event == LJ_EVENT_NONE) {
 			continue;

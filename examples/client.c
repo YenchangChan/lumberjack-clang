@@ -2,16 +2,17 @@
 
 int main(void){
     lumberjack_config_t config  = {
-        .hosts = "192.168.110.8",
-        .port  = 7443,
-        .compress_level = 0,
-        .client_port_range = "60000,60100",
-        .bandwidth = 0,
-        .protocol = LUMBERJACK_PROTO_VERSION_V2,
-        .timeout = 10,
-        .batch = 200,
-        .with_ssl = true,
-        .metric_interval = 5,
+        .hosts                  = "192.168.110.8",
+        .port                   = 7443,
+        .compress_level         = 0,
+        .client_port_range      = "60000,60100",
+        .bandwidth              = 0,
+        .protocol               = LUMBERJACK_PROTO_VERSION_V2,
+        .timeout                = 10,
+        .batch                  = 200,
+        .with_ssl               = true,
+        .metric_interval        = 5,
+        .metric_enable          = true,
     };
     // lumberjack_config_t config = {0};
     lumberjack_client_t *client = lumberjack_new_client("itoa-flow-5961086096158208", &config);
@@ -27,8 +28,6 @@ int main(void){
             int n = client->send(client);
             if (n < 0) {
                 printf("send message failed\n");
-                client->stop(client);
-                client = NULL;
                 break;
             } else {
                 int ack = client->wait_and_ack(client);

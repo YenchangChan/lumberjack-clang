@@ -40,6 +40,8 @@ static void lumberjack_config_normalize(lumberjack_client_t *self, lumberjack_co
         }
     }
 
+    self->host_len = utils_string_split(config->hosts, self->hosts, ","); // will alloc memory, but not free
+
     self->config->hosts = strdup(config->hosts);
     self->config->port = config->port;
     self->config->batch = config->batch;
@@ -173,42 +175,42 @@ void lumberjack_ssl_disconnect(lumberjack_connect_t *conn)
  protocol
 ============================================================================*/
 
-static void lumberjack_lock(pthread_mutex_t mutex) {
-    pthread_mutex_lock(&mutex);
+static void lumberjack_lock(pthread_mutex_t *mutex) {
+    pthread_mutex_lock(mutex);
 }
 
-static void lumberjack_unlock(pthread_mutex_t mutex) {
-    pthread_mutex_unlock(&mutex);
+static void lumberjack_unlock(pthread_mutex_t *mutex) {
+    pthread_mutex_unlock(mutex);
 }
 
 static void lumberjack_set_sock_status(lumberjack_client_t *self, int status) {
-    lumberjack_lock(self->mutex);
+    lumberjack_lock(&self->mutex);
     self->conn.sock_status = status;
-    lumberjack_unlock(self->mutex);
+    lumberjack_unlock(&self->mutex);
 }
 
 static int lumberjack_get_sock_status(lumberjack_client_t *self)
 {
     int status;
-    lumberjack_lock(self->mutex);
+    lumberjack_lock(&self->mutex);
     status = self->conn.sock_status;
-    lumberjack_unlock(self->mutex);
+    lumberjack_unlock(&self->mutex);
     return status;
 }
 
 static void lumberjack_set_status(lumberjack_client_t *self, int status)
 {
-    lumberjack_lock(self->mutex);
+    lumberjack_lock(&self->mutex);
     self->status = status;
-    lumberjack_unlock(self->mutex);
+    lumberjack_unlock(&self->mutex);
 }
 
 static int lumberjack_get_status(lumberjack_client_t *self)
 {
     int status;
-    lumberjack_lock(self->mutex);
+    lumberjack_lock(&self->mutex);
     status = self->status;
-    lumberjack_unlock(self->mutex);
+    lumberjack_unlock(&self->mutex);
     return status;
 }
 
@@ -441,9 +443,9 @@ static void on_start(struct lumberjack_client_t *self){
 }
 
 static boolean on_push(lumberjack_client_t *self, char *message) {
-    lumberjack_lock(self->mutex);
+    lumberjack_lock(&self->mutex);
     if (self->data->wsize >= self->data->cap){
-        lumberjack_unlock(self->mutex);
+        lumberjack_unlock(&self->mutex);
         return false;
     };
     
@@ -451,13 +453,13 @@ static boolean on_push(lumberjack_client_t *self, char *message) {
         // the same window data has not send complete, do not push
         time_t now = time(NULL);
         if (self->window.batch_is_sending && now  == self->window.time) {
-            lumberjack_unlock(self->mutex);
+            lumberjack_unlock(&self->mutex);
             return false;
         }
     }
     *(self->data->message + self->data->wsize) = message;
     (self->data->wsize)++;
-    lumberjack_unlock(self->mutex);
+    lumberjack_unlock(&self->mutex);
     return true;
 }
 
@@ -465,10 +467,10 @@ static int on_send(lumberjack_client_t *self){
     if (self->is_connected(self) == false) {
         return -1;
     }
-    lumberjack_lock(self->mutex);
+    lumberjack_lock(&self->mutex);
     if (self->data->wsize == 0) {
         // there is no data to send
-        lumberjack_unlock(self->mutex);
+        lumberjack_unlock(&self->mutex);
         return 0;
     }
     if (self->data->size == 0) {
@@ -492,7 +494,7 @@ static int on_send(lumberjack_client_t *self){
                 // the same window, do not send duplicate
                 //printf("batch_is_sending: %d, count: %d, bandwidth: %d\n", self->window.batch_is_sending, self->window.count, self->config->bandwidth);
                 FD_SET(self->conn.sock, &self->conn.writefds);
-                lumberjack_unlock(self->mutex);
+                lumberjack_unlock(&self->mutex);
                 return 0;
             }
         } else {
@@ -524,7 +526,7 @@ static int on_send(lumberjack_client_t *self){
             }
 #endif
             close(self->conn.sock);
-            lumberjack_unlock(self->mutex);
+            lumberjack_unlock(&self->mutex);
             return nbytes;
         }
     }
@@ -549,7 +551,7 @@ static int on_send(lumberjack_client_t *self){
 
         FD_SET(self->conn.sock, &self->conn.writefds);
     }
-    lumberjack_unlock(self->mutex);
+    lumberjack_unlock(&self->mutex);
     return nbytes;
 }
 
@@ -591,9 +593,9 @@ RETRY:
     }
 
     int ack = lumberjack_parse_ack(self->header, buffer, nbytes);
-    lumberjack_lock(self->mutex);
+    lumberjack_lock(&self->mutex);
     self->metrics->ack_lines += ack;
-    lumberjack_unlock(self->mutex);
+    lumberjack_unlock(&self->mutex);
     FD_CLR(self->conn.sock, &(self->conn.readfds));
     FD_SET(self->conn.sock, &self->conn.writefds);
     return ack;
@@ -612,7 +614,7 @@ static void on_stop(lumberjack_client_t *self){
     for(i = 0; i <  self->host_len;  i++)  {
         _FREE(self->hosts[i]);
     }
-    lumberjack_lock(self->mutex);
+    lumberjack_lock(&self->mutex);
     _FREE(self->config->hosts);
     _FREE(self->config);
     _FREE(self->header);
@@ -620,13 +622,16 @@ static void on_stop(lumberjack_client_t *self){
     _FREE(self->data);
     _FREE(self->metrics->metric_name);
     _FREE(self->metrics);
-    lumberjack_unlock(self->mutex);
+    lumberjack_unlock(&self->mutex);
     pthread_mutex_destroy(&(self->mutex));
     _FREE(self);
 }
 
 static void on_metrics_report(lumberjack_client_t *self)
 {
+    if (self->config->metric_enable == false) {
+        return;
+    }
     time_t now = time(NULL);
 	if (self->metrics->time == 0)
 	{
@@ -634,7 +639,7 @@ static void on_metrics_report(lumberjack_client_t *self)
 	}
 	else if (now - self->metrics->time >= self->metrics->interval)
 	{
-        lumberjack_lock(self->mutex);
+        lumberjack_lock(&self->mutex);
         printf("[metrics-logging] out_%s.timestamp=%d, out_%s.ack_lines=%ld, out_%s.send_bytes=%ld, out_%s.lines_per_second=%g, out_%s.size_per_second=%s/s\n",
                self->metrics->metric_name, time(NULL),
                self->metrics->metric_name, self->metrics->ack_lines,
@@ -644,7 +649,7 @@ static void on_metrics_report(lumberjack_client_t *self)
         self->metrics->time = now;
 		self->metrics->prev_lines = self->metrics->ack_lines;
 		self->metrics->prev_bytes = self->metrics->send_bytes;
-        lumberjack_unlock(self->mutex);
+        lumberjack_unlock(&self->mutex);
     }
 }
 
@@ -674,12 +679,11 @@ static int on_event_type(lumberjack_client_t *self) {
     return LJ_EVENT_ERROR;
 }
 
-void lumberjack_event_loop(lumberjack_client_t *self) {
+void lumberjack_event_loop(void *arg) {
+    lumberjack_client_t *self = (lumberjack_client_t *)arg;
     int expect_ack = 0;
     while (1) {
-        if (self->config->metric_enable) {
-		    self->metrics_report(self);
-        }
+		self->metrics_report(self);
 		int event = self->event_type(self);
 		if (event == LJ_EVENT_NONE) {
 			continue;
@@ -727,7 +731,7 @@ lumberjack_client_t *lumberjack_new_client(char *module_name, lumberjack_config_
     }
     client->config = calloc(1, sizeof(lumberjack_config_t));
     lumberjack_config_normalize(client, config);
-    client->host_len = utils_string_split(config->hosts, client->hosts, ","); // will alloc memory, but not free
+
     lumberjack_repick_host(client);
     client->conn.port = client->config->port;
     client->conn.sock_status = SS_DISCONNECT;
@@ -750,6 +754,7 @@ lumberjack_client_t *lumberjack_new_client(char *module_name, lumberjack_config_
     client->metrics->interval = config->metric_interval;
     module_name = (module_name == NULL) ? LUMBERJACK_METRIC_NAME_DEFAULT : module_name;
     client->metrics->metric_name = strdup(module_name);
+    
     pthread_mutex_init(&(client->mutex), NULL);
 
     client->status = LJ_STATUS_INIT;
