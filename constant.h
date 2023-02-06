@@ -52,6 +52,12 @@ typedef int boolean;
 #define MB  (1 << 20)
 #define GB  (1 << 30)
 
+#ifdef __LP64__
+#define LJ_INT64_T_FMT "ld"
+#else
+#define LJ_INT64_T_FMT "lld"
+#endif
+
 #define _FREE(v)    if (v != NULL) {     \
                         free(v);         \
                         v = NULL;        \
@@ -60,6 +66,5 @@ typedef int boolean;
 #ifdef __cplusplus
 }
 #endif
-
 
 #endif

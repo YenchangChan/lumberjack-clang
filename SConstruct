@@ -176,9 +176,11 @@ else:
         # Dwarf Error: wrong version in compilation unit header (is 5, should be 2, 3, or 4)
         cppflags += ['-gdwarf-4', '-gstrict-dwarf']
     if plat == 'aix':
+        # https://blog.csdn.net/in2000/article/details/6077968 errno on aix is not thread safe
+        cppdefines += ['_THREAD_SAFE']
         syslibs = ['z', 'ssl', 'crypto', 'rt', 'dl', 'pthread']
     elif plat == 'hpux':
-        syslibs = ['ssl', 'crypto', 'z']
+        syslibs = ['z', 'ssl', 'crypto', 'rt', 'dl', 'pthread']
     else:
         syslibs = [':libz.a.a', 'ssl', 'crypto', 'rt', 'dl', 'pthread']
         if plat == 'linux' and platform.processor() == 'i686':

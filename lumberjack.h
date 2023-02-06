@@ -8,18 +8,24 @@ extern "C" {
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <strings.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
-#include <pthread.h>
 #ifndef _WIN32
+#include <pthread.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/select.h>
 #else
 #include <windows.h>
+#ifndef _WIN32_WCE
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <mswsock.h>
+#else
+#include <winsock.h>
+#endif
 #endif
 
 #ifdef HAVE_ZLIB_H
@@ -65,10 +71,10 @@ typedef struct lumberjack_connect_t {
     int                     domain;
     int                     sock_status;
     boolean                 is_ipv6;
-#ifndef _WIN32
-    int                     sock;
     fd_set                  readfds;
     fd_set                  writefds;
+#ifndef _WIN32
+    int                     sock;
 #else
     SOCKET                  sock;
 #endif
@@ -151,10 +157,15 @@ typedef struct lumberjack_client_t {
     lumberjack_header_t *header;
     lumberjack_data_t *data;
     lumberjack_metrics_t *metrics;
-    pthread_mutex_t mutex;
     lumberjack_window_t window;
-    pthread_t worker_thread;
     int status;
+#ifndef _WIN32
+    pthread_mutex_t mutex;
+    pthread_t worker_thread;
+#else
+    HANDLE    mutex;
+    HANDLE    worker_thread;
+#endif
 } lumberjack_client_t;
 
 lumberjack_client_t *lumberjack_new_client(char *module_name, lumberjack_config_t *config);

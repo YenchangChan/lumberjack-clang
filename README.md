@@ -33,5 +33,6 @@
     - scons //done
 - 问题：
     - 极限性能在25w左右，还是不太能达到要求
-    - 开启多线程，一个push，一个发和收的话，会经常性出现 akc mismatch
-    - ssl 会core掉
+    - 跨平台支持
+        - aix， hpux done
+        - Windows待验证
