@@ -35,4 +35,9 @@
     - 极限性能在25w左右，还是不太能达到要求
     - 跨平台支持
         - aix， hpux done
-        - Windows待验证
+        - Windows done, win2003 待验证
+
+- 功能
+    - 支持endpoint方式配置ip和端口号
+    - ssl支持证书校验
+    - 性能优化？

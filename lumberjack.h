@@ -11,6 +11,8 @@ extern "C" {
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+#include <stdint.h>
+
 #ifndef _WIN32
 #include <pthread.h>
 #include <sys/socket.h>
@@ -18,7 +20,6 @@ extern "C" {
 #include <unistd.h>
 #include <sys/select.h>
 #else
-#include <windows.h>
 #ifndef _WIN32_WCE
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -26,6 +27,7 @@ extern "C" {
 #else
 #include <winsock.h>
 #endif
+#include <windows.h>
 #endif
 
 #ifdef HAVE_ZLIB_H
@@ -40,13 +42,14 @@ extern "C" {
 #include "constant.h"
 
 typedef struct lumberjack_config_t {
-    char                *hosts;
-    unsigned int        port;
+    char                *hosts;     // only contians ip
+    char                *endpoint;  // contains ip and port, for ipv4 ip:port and for ipv6 [ip]:port
+    unsigned int        port;       // works with hosts, if endpoint is not null, then port will useless
     unsigned int        batch;
     boolean             with_ssl;
-    char                protocol;
-    unsigned int        compress_level;
-    unsigned int        bandwidth;
+    char                protocol;   // only support v2 yet
+    unsigned int        compress_level; // if level = 0, means no compress
+    unsigned int        bandwidth; // if bandwidth = 0, means unlimit
     char                *client_port_range;
     int                 timeout;
     int                 metric_interval;

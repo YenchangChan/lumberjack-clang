@@ -101,7 +101,7 @@ static void lumberjack_repick_host(lumberjack_client_t *self) {
     int i=0;
     //random pick one if init
     if(self->conn.host == NULL) {
-        srand(time(NULL));
+        srand((unsigned int)time(NULL));
         i = rand() % self->host_len;
         if (self->hosts[i] != NULL && strlen(self->hosts[i]) != 0){
             self->conn.host = self->hosts[i];
@@ -179,7 +179,7 @@ static void lumberjack_lock(lumberjack_client_t *self) {
 #ifndef _WIN32
     pthread_mutex_lock(&self->mutex);
 #else
-    WaitForSingleObject(mutex, INFINITE);
+    WaitForSingleObject(self->mutex, INFINITE);
 #endif
 }
 
@@ -187,7 +187,7 @@ static void lumberjack_unlock(lumberjack_client_t *self) {
 #ifndef _WIN32
     pthread_mutex_unlock(&self->mutex);
 #else
-    ReleaseMutex(mutex);
+    ReleaseMutex(self->mutex);
 #endif
 }
 
@@ -361,7 +361,12 @@ static boolean on_is_connected(lumberjack_client_t *self){
             } else {
                 rv = connect(self->conn.sock, (struct sockaddr*)&self->conn.addr.v4, sizeof(self->conn.addr.v4));
             }
-            if (rv ==  0 || errno == EISCONN){         
+#ifndef _WIN32
+            if (rv == 0 || errno == EISCONN)
+#else
+            if (rv == 0 || WSAGetLastError() == WSAEISCONN)
+#endif
+            {        
 #ifdef HAVE_SSL_H
                 if (self->config->with_ssl)
                 {
@@ -374,7 +379,11 @@ static boolean on_is_connected(lumberjack_client_t *self){
                 FD_SET(self->conn.sock, &self->conn.writefds);
                 lumberjack_set_sock_status(self, SS_CONNECTED);
                 return true;
+#ifndef _WIN32
             } else if ( errno == EINPROGRESS ||errno == EALREADY) {
+#else
+            } else if ( WSAGetLastError() == WSAEWOULDBLOCK ||WSAGetLastError() == WSAEALREADY) {
+#endif
                 // still pending
                 return false;
             }
@@ -412,7 +421,7 @@ static void on_start(struct lumberjack_client_t *self){
     WORD sockVersion = MAKEWORD(2,2);
     WSADATA wsaData;
     if( WSAStartup (sockVersion, &wsaData)!=0) {
-        return -1;
+        return;
     }
 #endif
     printf("choose host %s:%d to connect\n", self->conn.host, self->conn.port);
@@ -436,8 +445,13 @@ static void on_start(struct lumberjack_client_t *self){
     }
 
     //set non-blocking
+#ifndef _WIN32
     int flags = fcntl(self->conn.sock, F_GETFL, 0);
     fcntl(self->conn.sock, F_SETFL, flags|O_NONBLOCK);
+#else
+    int ul = 1;
+    ioctlsocket(self->conn.sock, FIONBIO, (unsigned long *)&ul);
+#endif
     if (self->conn.is_ipv6) {
         rv = connect(self->conn.sock, (struct sockaddr*)&self->conn.addr.v6, sizeof(self->conn.addr.v6));
     } else {
@@ -457,10 +471,13 @@ static void on_start(struct lumberjack_client_t *self){
         lumberjack_set_sock_status(self, SS_CONNECTED);
         return;
     } else {
-        if (errno == EINPROGRESS) {
+#ifndef _WIN32
+        if (errno == EINPROGRESS)
+#else
+        if (WSAGetLastError() == WSAEWOULDBLOCK)
+#endif
+        {
             lumberjack_set_sock_status(self, SS_PENDING);
-        } else {
-            perror("connect");
         }
     }
 }
@@ -538,7 +555,11 @@ static int on_send(lumberjack_client_t *self){
         nbytes = send(self->conn.sock, self->data->data + self->data->has_sended, n, 0);
     }
     if (nbytes < 0) {
+#ifndef _WIN32
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
+#else 
+        if (WSAGetLastError() == WSAEWOULDBLOCK) {
+#endif
             nbytes  =  0;
         } else {
             self->conn.sock_status = SS_DISCONNECT;
@@ -548,7 +569,12 @@ static int on_send(lumberjack_client_t *self){
                 lumberjack_ssl_disconnect(&(self->conn));
             }
 #endif
+#ifndef _WIN32
             close(self->conn.sock);
+#else
+            closesocket(self->conn.sock);
+            WSACleanup();
+#endif
             lumberjack_unlock(self);
             return nbytes;
         }
@@ -584,11 +610,11 @@ unsigned int on_wait_and_ack(lumberjack_client_t *self){
     }
     int nbytes = 0;
     char buffer[16] = {0};
-    int64_t now, before;
-    before = utils_time_now();
+    time_t now, before;
+    before = time(NULL);
 RETRY:
-    now = utils_time_now();
-    if (self->config->timeout > 0 && now - before >= self->config->timeout * 1e6) {
+    now = time(NULL);
+    if (self->config->timeout > 0 && now - before >= self->config->timeout) {
         // timeout
         return -1;
     }
@@ -602,7 +628,11 @@ RETRY:
     }
     //printf("nbytes: %d, buffer: %s\n", nbytes, buffer);
     if (nbytes < 0) {
+#ifndef _WIN32
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
+#else 
+        if (WSAGetLastError() == WSAEWOULDBLOCK) {
+#endif
             goto RETRY;
         } else {
             self->conn.sock_status = SS_DISCONNECT;
@@ -611,7 +641,12 @@ RETRY:
                 lumberjack_ssl_disconnect(&(self->conn));
             }
 #endif
+#ifndef _WIN32
             close(self->conn.sock);
+#else
+            closesocket(self->conn.sock);
+            WSACleanup();
+#endif
         }
     }
 
@@ -676,8 +711,8 @@ static void on_metrics_report(lumberjack_client_t *self)
 	else if (now - self->metrics->time >= self->metrics->interval)
 	{
         lumberjack_lock(self);
-        printf("[metrics-logging] out_%s.timestamp=%d, out_%s.ack_lines=%" LJ_INT64_T_FMT ",  out_%s.send_bytes=%" LJ_INT64_T_FMT ", out_%s.lines_per_second=%g,  out_%s.size_per_second=%s/s\n",
-               self->metrics->metric_name, time(NULL),
+        printf("[metrics-logging] out_%s.timestamp=%u, out_%s.ack_lines=%" LJ_INT64_T_FMT ",  out_%s.send_bytes=%" LJ_INT64_T_FMT ", out_%s.lines_per_second=%g,  out_%s.size_per_second=%s/s\n",
+               self->metrics->metric_name, (unsigned int)time(NULL),
                self->metrics->metric_name, self->metrics->ack_lines,
                self->metrics->metric_name, self->metrics->send_bytes,
                self->metrics->metric_name, (self->metrics->ack_lines - self->metrics->prev_lines) / ((now - self->metrics->time * 1.0)),
@@ -749,6 +784,7 @@ DWORD WINAPI lumberjack_event_loop(LPVOID arg) {
             // printf("got ack = %d\n", ack);
         }
 	}
+    return;
 }
 
 static int on_bootstrap(lumberjack_client_t *self) {
@@ -764,6 +800,7 @@ static int on_bootstrap(lumberjack_client_t *self) {
         return -1;
     }
 #endif
+    return 0;
 }
 
 static int on_status(lumberjack_client_t *self) {

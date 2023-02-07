@@ -135,15 +135,18 @@ files = list()
 
 if plat == 'win32':
     # https://docs.microsoft.com/en-us/cpp/build/reference/mp-build-with-multiple-processes?view=msvc-140
-    cppflags = ['/W3', '/Z7', '/MT']
+    cppflags = ['/W3', '/Z7', '/FD', '/MP', '/FS']
     linkflags = ['/LTCG', '/IGNORE:4099']
-    cppdefines = ['_WIN32', 'WIN32', 'WINNT', '_WINDOWS', 'NDEBUG', 'ENABLE_ZLIB','ENABLE_OPENSSL']
-    cpppath = ['c:/developer/apr-dist/include', 'c:/developer/flow/include', 'c:/developer/libiconv-dist/include']
-    syslibs = ['Advapi32.lib', 'Ws2_32.lib', 'wevtapi.lib', 'ole32.lib', 'Dbghelp.lib', 'Gdi32.lib', 'User32.lib']
+    cppdefines = ['_WIN32', 'WIN32', 'WINNT', '_WINDOWS', 'NDEBUG', '_CRT_SECURE_NO_WARNINGS', 'HAVE_ZLIB_H','HAVE_SSL_H']
+    cpppath = ['c:/developer/flow/include']
+    libpath = ['.', 'c:/developer/flow/lib']
+    syslibs = ['kernel32.lib', 'user32.lib', 'advapi32.lib', 'ws2_32.lib', 
+               'wsock32.lib', 'netapi32.lib', 'Dbghelp.lib', 'version.lib', 
+               'shell32.lib', 'wevtapi.lib', 'ole32.lib', 'Gdi32.lib',
+               'ssleay32.lib', 'libeay32.lib', 'zlib.lib']
+    exe_suffix = ['client', 'event', 'boot', 'client_cpp']
+    files = [item if item not in exe_suffix else item + '.exe' for item in files]
     win_edition = GetOption('win_edition')
-    mylibs += ['c:/developer/flow/lib/ssleay32.lib',
-    'c:/developer/flow/lib/libeay32.lib', 
-    'c:/developer/flow/lib/zlib.lib']
     VC_CRT_DIST="C:/Program Files (x86)/Microsoft Visual Studio 8/VC/redist/x86/Microsoft.VC80.CRT/"
     VC_DEBUG_CRT_DIST="C:/Program Files (x86)/Microsoft Visual Studio 8/VC/redist/Debug_NonRedist/x86/Microsoft.VC80.DebugCRT/"
     VS2005_DIST = 'C:/developer/vs2005/'
@@ -159,7 +162,7 @@ if plat == 'win32':
     env = Environment(TARGET_ARCH='x86')
     env.Append(LINKFLAGS=linkflags)
     if win_edition == '2003':
-        cppdefines += ['_USING_V110_SDK71_', '_MBCS', '_WIN32_WINNT=0x0502', 'DISABLE_IM_MSVISTALOG']
+        cppdefines += ['_USING_V110_SDK71_', '_MBCS', '_WIN32_WINNT=0x0502']
         env['LINKFLAGS'] = ['/SUBSYSTEM:CONSOLE",5.01"']
     else:
         # MSVC_VERSION - Sets the preferred version of Microsoft Visual C/C++ to use.
@@ -203,13 +206,12 @@ env.Program('boot', ['examples/boot.c'], LIBS=['lumberjack'] + syslibs)
 #     cppflags += ['-std=c++11', '-pthread']
 #     linkflags = ['-static-libgcc', '-static-libstdc++']
 #     env.Program('client-cpp', ['examples/client_thread.cpp'], LIBS=['lumberjack'] + syslibs, LINKFLAGS=linkflags)
-
-files += ['liblumberjack.a']
+if plat == 'win32':
+    files += ['lumberjack.lib']
+else:
+    files += ['liblumberjack.a']
 
 if GetOption('clean'):
-    extras = ['VERSION', 'client.exp', 'client.lib', '.sconsign.dblite', 'vc140.pdb', 'client.ilk']
-    for target in extras:
-        env.Command(target, '', Delete('${TARGET}'))
     if os.path.exists(prefix):
         shutil.rmtree(prefix)
 elif not GetOption('help'):

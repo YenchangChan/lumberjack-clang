@@ -27,45 +27,6 @@ boolean utils_is_ipv6_address(char *address){
     return tmp != NULL;
 }
 
-int64_t utils_time_now() {
-#ifndef _WIN32
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1e6 + tv.tv_usec; 
-#else 
-    int64_t tv = 0;
-    FILETIME time;
-#ifndef _WIN32_WCE
-    GetSystemTimeAsFileTime(&time);
-#else
-    SYSTEMTIME st; 
-    GetSystemTime(&st);
-    SystemTimeToFileTime(&st, &time);
-#endif
-    FileTimeToAprTime(&tv, &time);
-    return tv;
-#endif
-}
-
-void utils_sleep(int64_t t) {
-#ifndef _WIN32
-#ifdef OS2
-    DosSleep(t/1000);
-#elif defined(BEOS)
-    snooze(t);
-#elif defined(NETWARE)
-    delay(t/1000);
-#else
-    struct timeval tv; 
-    tv.tv_usec = t % (int64_t)1e6;
-    tv.tv_sec = t / 1e6;
-    select(0, NULL, NULL, NULL, &tv);
-#endif
-#else   
-    Sleep(DWORD)(t / 1000);
-#endif
-}
-
 void utils_dump_hex(char *str, int len) {
     int i = 0;
     for (i = 0; i < len; i += 16)
@@ -102,7 +63,7 @@ void utils_dump_hex(char *str, int len) {
 char * utils_fmt_size(int64_t size) {
     static char buff[32] = {0};
     if (size < KB) {
-        sprintf(buff, "%g B", size);
+        sprintf(buff, "%g B", size/1.0);
     } else if (size < MB) {
         sprintf(buff, "%g KB", size/(KB*1.0));
     } else if (size < GB){
@@ -111,4 +72,36 @@ char * utils_fmt_size(int64_t size) {
         sprintf(buff, "%g GB", size / (GB * 1.0));
     }
     return buff;
+}
+
+
+int utils_split_host_port(const char *endpoint, char *host, int *port){
+    int i = 0, split = 0, len = 0;
+    char port_str[8] = {0};
+    boolean is_ipv6 = (endpoint[0] == '[') ? true : false;
+    len = strlen(endpoint);
+    for (i = len; i > 0; i--) {
+        if (*(endpoint + i) == ':') {
+            split = i;
+            break;
+        }
+    }
+    if (split == 0 || split == len) {
+        return -1;
+    }
+    if(is_ipv6) {
+        if (split <= 2) {
+            return -1;
+        }
+        strncpy(host, endpoint + 1, split - 2);
+    } else {
+        strncpy(host, endpoint, split);
+    }
+    
+    strncpy(port_str, endpoint + i + 1, len - split);
+    *port = atoi(port_str);
+    if (*port < 0) {
+        return -1;
+    }
+    return 0;
 }

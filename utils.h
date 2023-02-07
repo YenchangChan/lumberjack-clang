@@ -10,20 +10,24 @@ extern "C" {
 #include <string.h>
 #include <stdint.h>
 
-#ifndef _WIN32
-#include <sys/time.h>
+#ifdef _WIN32
+#ifndef _WIN32_WCE
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <mswsock.h>
 #else
-
+#include <winsock.h>
+#endif
+#include <windows.h>
 #endif
 
 #include "constant.h"
 
 int utils_string_split(const char *src,  char  **dst, const char *delim);
 boolean utils_is_ipv6_address(char *address);
-int64_t utils_time_now();
-void utils_sleep(int64_t t);
 void utils_dump_hex(char *str, int len);
 char *utils_fmt_size(int64_t size);
+int utils_split_host_port(const char *endpoint, char *host, int *port);
 
 #ifdef __cplusplus
 }

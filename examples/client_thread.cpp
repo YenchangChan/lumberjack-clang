@@ -5,8 +5,6 @@
 #include <mutex>
 
 int main() {
-	// lumberjack_config_t config = {0};
-	// config.hosts = (char *)"192.168.110.8";
 	lumberjack_config_t config  = {
         hosts 					: (char *)"192.168.110.8",
         port  					: 7443,

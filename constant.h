@@ -5,9 +5,13 @@
 extern "C" {
 #endif
 
-typedef int boolean;
-#define true  1
-#define false 0
+
+
+#ifndef _WIN32
+typedef unsigned char boolean;
+#endif
+#define true        (1)
+#define false       (0)
 
 #define LUMBERJACK_HOSTS_SIZE               128
 #define LUMBERJACK_CHUNK                    2048
@@ -42,20 +46,28 @@ typedef int boolean;
 #define LJ_EVENT_READ            1
 #define LJ_EVENT_WRITE           2
 
-#define LJ_STATUS_INIT           0
-#define LJ_STATUS_START          1
-#define LJ_STATUS_STOP           2
+#define LJ_STATUS_INIT                  0
+#define LJ_STATUS_START                 1
+#define LJ_STATUS_STOP                  2
 #define LJ_STATUS_ACK_MISMATCH          3
-#define LJ_STATUS_FAILED         -1
+#define LJ_STATUS_FAILED                -1
 
 #define KB  (1 << 10)
 #define MB  (1 << 20)
 #define GB  (1 << 30)
 
-#ifdef __LP64__
+#ifdef _WIN32
+#define strdup _strdup
+#define LJ_INT64_T_FMT "I64d"
+#elif __LP64__
 #define LJ_INT64_T_FMT "ld"
 #else
 #define LJ_INT64_T_FMT "lld"
+#endif
+
+#ifdef _MSC_VER
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
 #endif
 
 #define _FREE(v)    if (v != NULL) {     \
