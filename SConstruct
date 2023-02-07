@@ -137,7 +137,7 @@ if plat == 'win32':
     # https://docs.microsoft.com/en-us/cpp/build/reference/mp-build-with-multiple-processes?view=msvc-140
     cppflags = ['/W3', '/Z7', '/FD', '/MP', '/FS']
     linkflags = ['/LTCG', '/IGNORE:4099']
-    cppdefines = ['_WIN32', 'WIN32', 'WINNT', '_WINDOWS', 'NDEBUG', '_CRT_SECURE_NO_WARNINGS', 'HAVE_ZLIB_H','HAVE_SSL_H']
+    cppdefines = ['_WIN32', 'WIN32', 'WINNT', '_WINDOWS', 'NDEBUG', '_CRT_SECURE_NO_WARNINGS', '_WINSOCK_DEPRECATED_NO_WARNINGS', 'HAVE_ZLIB_H','HAVE_SSL_H']
     cpppath = ['c:/developer/flow/include']
     libpath = ['.', 'c:/developer/flow/lib']
     syslibs = ['kernel32.lib', 'user32.lib', 'advapi32.lib', 'ws2_32.lib', 

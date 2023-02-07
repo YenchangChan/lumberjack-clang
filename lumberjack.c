@@ -433,12 +433,26 @@ static void on_start(struct lumberjack_client_t *self){
         memset((void*)&self->conn.addr.v6, 0, sizeof(self->conn.addr.v6));
         self->conn.addr.v6.sin6_family = self->conn.domain;
         self->conn.addr.v6.sin6_port = htons(self->config->port);
+#ifndef _WIN32
         inet_pton(self->conn.domain, self->conn.host, &self->conn.addr.v6.sin6_addr);   
+#else
+        struct sockaddr_storage ss;
+        int size = sizeof(ss);
+        WSAStringToAddress(self->conn.host, self->conn.domain, NULL, (struct sockaddr *)&ss, &size);
+        self->conn.addr.v6.sin6_addr = ((struct sockaddr_in6 *)&ss)->sin6_addr;
+#endif
     } else {
         memset((void*)&self->conn.addr.v4, 0, sizeof(self->conn.addr.v4));
         self->conn.addr.v4.sin_family = self->conn.domain;
         self->conn.addr.v4.sin_port = htons(self->config->port);
+#ifndef _WIN32
         inet_pton(self->conn.domain, self->conn.host, &self->conn.addr.v4.sin_addr);   
+#else
+        struct sockaddr_storage ss;
+        int size = sizeof(ss);
+        WSAStringToAddress(self->conn.host, self->conn.domain, NULL, (struct sockaddr *)&ss, &size);
+        self->conn.addr.v4.sin_addr = ((struct sockaddr_in *)&ss)->sin_addr;
+#endif
     }
     if (self->config->_client_port_enable) {
         lumberjack_pick_client_port(self);
@@ -759,6 +773,9 @@ DWORD WINAPI lumberjack_event_loop(LPVOID arg) {
     lumberjack_client_t *self = (lumberjack_client_t *)arg;
     int expect_ack = 0;
     while (1) {
+        if (lumberjack_get_status(self) == LJ_STATUS_STOP) {
+            break;
+        }
 		self->metrics_report(self);
         int event = self->event_type(self);
         if (event == LJ_EVENT_NONE) {
@@ -784,7 +801,9 @@ DWORD WINAPI lumberjack_event_loop(LPVOID arg) {
             // printf("got ack = %d\n", ack);
         }
 	}
-    return;
+#ifdef _WIN32
+    return 0;
+#endif
 }
 
 static int on_bootstrap(lumberjack_client_t *self) {
