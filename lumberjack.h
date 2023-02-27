@@ -48,6 +48,9 @@ typedef struct lumberjack_config_t {
     unsigned int        port;       // works with hosts, if endpoint is not null, then port will useless
     unsigned int        batch;
     boolean             with_ssl;
+    char                *cafile;
+    char                *certfile;
+    char                *certkeyfile;
     char                protocol;   // only support v2 yet
     unsigned int        compress_level; // if level = 0, means no compress
     unsigned int        bandwidth; // if bandwidth = 0, means unlimit

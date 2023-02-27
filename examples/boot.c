@@ -4,18 +4,20 @@ int main(void)
 {
 	lumberjack_config_t config = {
 		.hosts 					= "192.168.110.8",
-		.port 					= 7070,
+		.port 					= 7443,
 		.compress_level 		= 0,
 		.client_port_range 		= "60000,60100",
 		.bandwidth 				= 0,
 		.protocol 				= LUMBERJACK_PROTO_VERSION_V2,
 		.timeout 				= 10,
 		.batch 					= 1000,
-		.with_ssl 				= false,
+		.with_ssl 				= true,
 		.metric_interval 		= 5,
 		.metric_enable 			= true,
+		.cafile                 = "/data01/xlx/ssl/ca-cert.pem",
+		.certfile               = "/data01/xlx/ssl/client-vert.pem",
+		.certkeyfile            = "/data01/xlx/ssl/client-key.pem",
 	};
-	// lumberjack_config_t config = {0};
 	lumberjack_client_t *client = lumberjack_new_client(NULL, &config);
 	printf("client created %s:%d \n", client->conn.host, client->conn.port);
 	client->start(client);

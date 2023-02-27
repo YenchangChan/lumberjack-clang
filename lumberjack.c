@@ -52,6 +52,15 @@ static void lumberjack_config_normalize(lumberjack_client_t *self, lumberjack_co
     self->config->compress_level = config->compress_level;
     self->config->protocol = config->protocol;
     self->config->with_ssl = config->with_ssl;
+    if (self->config->cafile) {
+        self->config->cafile = strdup(config->cafile);
+    }
+    if (self->config->certfile) {
+        self->config->certfile = strdup(config->certfile);
+    }
+    if (self->config->certkeyfile) {
+        self->config->certkeyfile = strdup(config->certkeyfile);
+    }
     self->config->_client_port_enable = config->_client_port_enable;
     self->config->_client_port_start = config->_client_port_start;
     self->config->_client_port_end = config->_client_port_end;
@@ -127,7 +136,29 @@ static void lumberjack_repick_host(lumberjack_client_t *self) {
  ssl
 ============================================================================*/
 #ifdef HAVE_SSL_H
-void lumberjack_ssl_connect(lumberjack_connect_t *conn) {
+static void lumberjack_ssl_showcerts(SSL * ssl)
+{
+    X509 *cert;
+    char *line;
+ 
+    cert = SSL_get_peer_certificate(ssl);
+    if(SSL_get_verify_result(ssl) == X509_V_OK){
+        printf("证书验证通过\n");
+    }
+    if (cert != NULL) {
+        printf("数字证书信息:\n");
+        line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
+        printf("证书: %s\n", line);
+        free(line);
+        line = X509_NAME_oneline(X509_get_issuer_name(cert), 0, 0);
+        printf("颁发者: %s\n", line);
+        free(line);
+        X509_free(cert);
+    } else
+        printf("无证书信息！\n");
+}
+
+void lumberjack_ssl_connect(lumberjack_config_t *conf,lumberjack_connect_t *conn) {
     conn->ssl_handle = NULL;
     conn->ssl_ctx = NULL;
 
@@ -138,21 +169,43 @@ void lumberjack_ssl_connect(lumberjack_connect_t *conn) {
 
         conn->ssl_ctx = SSL_CTX_new(TLSv1_2_method());
         if (conn->ssl_ctx == NULL) {
-            ERR_print_errors_fp(stderr);
+            ERR_print_errors_fp(stdout);
         }
+
+        if (conf->cafile) {
+            if (SSL_CTX_load_verify_locations(conn->ssl_ctx, conf->cafile, NULL)<=0){
+                ERR_print_errors_fp(stdout);
+            }
+        }
+        if (conf->certfile) {
+            SSL_CTX_set_verify(conn->ssl_ctx, SSL_VERIFY_PEER|SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
+            if (SSL_CTX_use_certificate_file(conn->ssl_ctx, conf->certfile, SSL_FILETYPE_PEM) <= 0) {
+                ERR_print_errors_fp(stdout);
+            }
+        }
+        if (conf->certkeyfile) {
+            if (SSL_CTX_use_PrivateKey_file(conn->ssl_ctx, conf->certkeyfile, SSL_FILETYPE_PEM) <= 0) {
+                ERR_print_errors_fp(stdout);
+            }
+            if (!SSL_CTX_check_private_key(conn->ssl_ctx)) {
+                ERR_print_errors_fp(stdout);
+            }
+        }
+        
 
         conn->ssl_handle = SSL_new(conn->ssl_ctx);
         if (conn->ssl_handle == NULL) {
-            ERR_print_errors_fp(stderr);
+            ERR_print_errors_fp(stdout);
         }
 
         if (!SSL_set_fd(conn->ssl_handle, conn->sock)) {
-            ERR_print_errors_fp(stderr);
+            ERR_print_errors_fp(stdout);
         }
         if (SSL_connect(conn->ssl_handle) != 1) {
-            ERR_print_errors_fp(stderr);
-        }
+            ERR_print_errors_fp(stdout);
+        } 
         printf("ssl connection established\n");
+        //lumberjack_ssl_showcerts(conn->ssl_handle);
     } else {
         printf("ssl connection failed\n");
     }
@@ -350,7 +403,7 @@ static boolean on_is_connected(lumberjack_client_t *self){
 #ifdef HAVE_SSL_H
                 if (self->config->with_ssl)
                 {
-                    lumberjack_ssl_connect(&self->conn);
+                    lumberjack_ssl_connect(self->config, &self->conn);
                 }
 #endif
                 FD_ZERO(&self->conn.readfds);
@@ -373,7 +426,6 @@ static boolean on_is_connected(lumberjack_client_t *self){
         default:
             break;
     }
-
     //should reconnect
 #ifdef HAVE_SSL_H
     if (self->config->with_ssl) {
@@ -455,7 +507,7 @@ static void on_start(struct lumberjack_client_t *self){
 #ifdef HAVE_SSL_H
         if (self->config->with_ssl)
         {
-            lumberjack_ssl_connect(&self->conn);
+            lumberjack_ssl_connect(self->config, &self->conn);
         }
 #endif
         FD_ZERO(&self->conn.readfds);
@@ -556,19 +608,7 @@ static int on_send(lumberjack_client_t *self){
 #endif
             nbytes  =  0;
         } else {
-            self->conn.sock_status = SS_DISCONNECT;
-            
-#ifdef HAVE_SSL_H
-            if (self->config->with_ssl) {
-                lumberjack_ssl_disconnect(&(self->conn));
-            }
-#endif
-#ifndef _WIN32
-            close(self->conn.sock);
-#else
-            closesocket(self->conn.sock);
-            WSACleanup();
-#endif
+            lumberjack_set_sock_status(self, SS_DISCONNECT);
             lumberjack_unlock(self);
             return nbytes;
         }
@@ -629,18 +669,7 @@ RETRY:
 #endif
             goto RETRY;
         } else {
-            self->conn.sock_status = SS_DISCONNECT;
-#ifdef HAVE_SSL_H
-            if (self->config->with_ssl) {
-                lumberjack_ssl_disconnect(&(self->conn));
-            }
-#endif
-#ifndef _WIN32
-            close(self->conn.sock);
-#else
-            closesocket(self->conn.sock);
-            WSACleanup();
-#endif
+            lumberjack_set_sock_status(self, SS_DISCONNECT);
         }
     }
 
@@ -678,6 +707,9 @@ static void on_stop(lumberjack_client_t *self){
     lumberjack_lock(self);
     lumberjack_buf_destory(self->data->buf);
     _FREE(self->config->hosts);
+    _FREE(self->config->cafile);
+    _FREE(self->config->certfile);
+    _FREE(self->config->certkeyfile);
     _FREE(self->config);
     _FREE(self->header);
     _FREE(self->data->message);
