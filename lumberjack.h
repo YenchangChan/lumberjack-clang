@@ -40,6 +40,7 @@ extern "C" {
 #endif
 
 #include "constant.h"
+#include "buf.h"
 
 typedef struct lumberjack_config_t {
     char                *hosts;     // only contians ip
@@ -93,8 +94,7 @@ typedef struct lumberjack_data_t {
     int             wsize; // real size
     int             cap;   // each batch size
     char            **message; // array of message
-    char            *data;
-    unsigned int    size;
+    lumberjack_buf_t *buf;
     unsigned int    has_sended;
     boolean         sending;
     int             expect_ack;

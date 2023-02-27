@@ -195,7 +195,7 @@ env['CPPDEFINES'] = cppdefines
 env['CPPPATH'] = cpppath
 env['LIBPATH'] = libpath
 
-lib_sources = 'lumberjack.c utils.c'.split()
+lib_sources = 'lumberjack.c utils.c buf.c'.split()
 
 env.StaticLibrary('lumberjack', lib_sources)
 

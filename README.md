@@ -39,5 +39,7 @@
 
 - 功能
     - 支持endpoint方式配置ip和端口号
+    - 加一个error处理
     - ssl支持证书校验
+    - memory优化，不要频繁申请内存，重复利于buffer
     - 性能优化？

@@ -10,7 +10,7 @@ int main(void)
 		.bandwidth 				= 0,
 		.protocol 				= LUMBERJACK_PROTO_VERSION_V2,
 		.timeout 				= 10,
-		.batch 					= 100,
+		.batch 					= 1000,
 		.with_ssl 				= false,
 		.metric_interval 		= 5,
 		.metric_enable 			= true,

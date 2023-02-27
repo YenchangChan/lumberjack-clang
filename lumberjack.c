@@ -247,22 +247,20 @@ static int lumberjack_parse_ack(lumberjack_header_t *header, char *data, int len
     return got_ack;
 }
 
-static void lumberjack_compress_deflate(lumberjack_client_t *self, char *data, int len) {
+static void lumberjack_compress_deflate(lumberjack_client_t *self) {
 #ifdef HAVE_ZLIB_H
-    int ret;
+    int ret, header_size;
     z_stream strm;
     unsigned char output[LUMBERJACK_CHUNK];
-    int sp;
-    int payload_size = 0;
-    char *compressed = NULL;
+    lumberjack_buf_t *compressed = lumberjack_buf_create();
 
     strm.zalloc = Z_NULL;
     strm.zfree = Z_NULL;
     strm.opaque = Z_NULL;
     deflateInit(&strm, self->config->compress_level);
-    strm.next_in = data;
-    strm.avail_in = len;
-
+    header_size = 2 + sizeof(int);
+    strm.next_in = self->data->buf->data + header_size;  //remove header 2W+wsize
+    strm.avail_in = self->data->buf->size - header_size;
     do
     {
         strm.avail_out = LUMBERJACK_CHUNK;
@@ -273,71 +271,53 @@ static void lumberjack_compress_deflate(lumberjack_client_t *self, char *data, i
         {
             break;
         }
-        sp = payload_size;
-        payload_size += (LUMBERJACK_CHUNK - strm.avail_out);
-        compressed = realloc(compressed, payload_size);
-        memcpy(compressed + sp, output, LUMBERJACK_CHUNK - strm.avail_out);
+        lumberjack_buf_append(compressed, output, LUMBERJACK_CHUNK - strm.avail_out);
     }
     while (strm.avail_out == 0)
         ;
 
     deflateEnd(&strm);
+    lumberjack_buf_reset(self->data->buf);
+    // 2W + window_size(bigendian)
+    lumberjack_buf_append(self->data->buf, self->header->window, 2);
+    int wsize = htonl(self->data->wsize);
+    lumberjack_buf_append(self->data->buf, (char *)&(wsize), sizeof(int));
     // 2C + payload_size(bigendian)
-    self->data->size += (2 + sizeof(int) + payload_size);
-    self->data->data = realloc(self->data->data, self->data->size);
-    memcpy(self->data->data + 2 + sizeof(int), self->header->compress, 2);
-    int compress_size = htonl(payload_size);
-    memcpy(self->data->data + 4 + sizeof(int), &compress_size, sizeof(int));
-    memcpy(self->data->data + 4 + 2 * sizeof(int), compressed, payload_size);
-    _FREE(compressed);
+    lumberjack_buf_append(self->data->buf, self->header->compress, 2);
+    int compress_size = htonl(compressed->size);
+    lumberjack_buf_append(self->data->buf, (char *)&compress_size, sizeof(int));
+    lumberjack_buf_append(self->data->buf, compressed->data, compressed->size);
+    lumberjack_buf_destory(compressed);
 #endif
 }
 
 
 static void lumberjack_pack_message(lumberjack_client_t *self){
-    int i, size = 0;
-    char *single_data = NULL;
-    char *data = NULL;
+    int i = 0;
     int wsize = htonl(self->data->wsize);
-    self->data->size = 2 + sizeof(int);
-    self->data->data = calloc(1, self->data->size);
     // 2W + window_size(bigendian)
-    memcpy(self->data->data, self->header->window, 2);
-    memcpy(self->data->data + 2, &(wsize), sizeof(int));
+    lumberjack_buf_append(self->data->buf, self->header->window, 2);
+    lumberjack_buf_append(self->data->buf, (char *)&(wsize), sizeof(int));
     for (i = 0; i < self->data->wsize; i++){
         // 2J + seq(bigendian) + payload_length(bigendian)
-        int n = 2 + 2 * sizeof(int) + strlen(self->data->message[i]);
         int len = htonl(strlen(self->data->message[i]));
         int seq = htonl(i + 1);
-        size += n;
-        single_data = calloc(1, n);
-        memcpy(single_data, self->header->data, 2);
-        memcpy(single_data + 2, &seq, sizeof(int));
-        memcpy(single_data + 2 + sizeof(int), &len, sizeof(int));
-        memcpy(single_data + 2 + 2 * sizeof(int), self->data->message[i], strlen(self->data->message[i]));
-        data = realloc(data, size);
-        memcpy(data + size - n, single_data, n);
-        _FREE(single_data);
+        lumberjack_buf_append(self->data->buf, self->header->data, 2);
+        lumberjack_buf_append(self->data->buf, (char *)&seq, sizeof(int));
+        lumberjack_buf_append(self->data->buf, (char *)&len, sizeof(int));
+        lumberjack_buf_append(self->data->buf, self->data->message[i], strlen(self->data->message[i]));
     }
 
     if (self->config->compress_level > 0) {
-        //utils_dump_hex(data, size);
-        lumberjack_compress_deflate(self, data, size);
-    } else {
-        self->data->size += size;
-        self->data->data = realloc(self->data->data, self->data->size);
-        memcpy(self->data->data + 2 + sizeof(int), data, size);
+        //utils_dump_hex(self->data->buf->data, self->data->buf->size);
+        lumberjack_compress_deflate(self);
     }
-    _FREE(data);
 }
 
 
 static void lumberjack_reset_message(lumberjack_client_t *self){
-    if (self->data->data) {
-        _FREE(self->data->data);
-        self->data->size = 0;
-        self->data->has_sended = 0;
-    }
+    lumberjack_buf_reset(self->data->buf);
+    self->data->has_sended = 0;
     int i = 0;
     for (i = 0; i < self->data->wsize; i++) {
         self->data->message[i] = NULL;
@@ -527,7 +507,7 @@ static int on_send(lumberjack_client_t *self){
         lumberjack_unlock(self);
         return 0;
     }
-    if (self->data->size == 0) {
+    if (self->data->buf->size == 0) {
         // last batch is all sended
         lumberjack_pack_message(self);
     }
@@ -535,7 +515,7 @@ static int on_send(lumberjack_client_t *self){
     int n = 0;
     if (self->config->bandwidth > 0) {
         // at most get bandwidth size
-        n = (self->data->size - self->data->has_sended > self->config->bandwidth) ? self->config->bandwidth : self->data->size - self->data->has_sended;
+        n = (self->data->buf->size - self->data->has_sended > self->config->bandwidth) ? self->config->bandwidth : self->data->buf->size - self->data->has_sended;
 
         time_t now = time(NULL);
         if (self->window.time == 0) {
@@ -557,16 +537,16 @@ static int on_send(lumberjack_client_t *self){
         }
         self->window.time = now;
     } else {
-        n = self->data->size - self->data->has_sended;
+        n = self->data->buf->size - self->data->has_sended;
     }
 
     int nbytes = 0;
     if (self->config->with_ssl) {
 #ifdef HAVE_SSL_H
-        nbytes = SSL_write(self->conn.ssl_handle, self->data->data + self->data->has_sended, n);
+        nbytes = SSL_write(self->conn.ssl_handle, self->data->buf->data + self->data->has_sended, n);
 #endif
     } else {
-        nbytes = send(self->conn.sock, self->data->data + self->data->has_sended, n, 0);
+        nbytes = send(self->conn.sock, self->data->buf->data + self->data->has_sended, n, 0);
     }
     if (nbytes < 0) {
 #ifndef _WIN32
@@ -596,7 +576,7 @@ static int on_send(lumberjack_client_t *self){
     self->data->has_sended += nbytes;
     self->metrics->send_bytes += nbytes;
     //printf("[%d][%d] has_sended %d, size: %d\n", time(NULL), self->window.time, self->data->has_sended, self->data->size);
-    if ( self->data->has_sended == self->data->size) {
+    if ( self->data->has_sended == self->data->buf->size) {
         // current batch is send completed
         lumberjack_reset_message(self);
         if (self->config->bandwidth > 0){
@@ -696,6 +676,7 @@ static void on_stop(lumberjack_client_t *self){
         _FREE(self->hosts[i]);
     }
     lumberjack_lock(self);
+    lumberjack_buf_destory(self->data->buf);
     _FREE(self->config->hosts);
     _FREE(self->config);
     _FREE(self->header);
@@ -847,7 +828,7 @@ lumberjack_client_t *lumberjack_new_client(char *module_name, lumberjack_config_
     client->data = calloc(1, sizeof(lumberjack_data_t));
     client->data->wsize = 0;
     client->data->cap = client->config->batch;
-    client->data->size = 0;
+    client->data->buf = lumberjack_buf_create();
     client->data->has_sended = 0;
     client->data->message = calloc(client->data->cap, sizeof(char *));
 

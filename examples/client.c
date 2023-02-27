@@ -9,7 +9,7 @@ int main(void){
         .bandwidth              = 0,
         .protocol               = LUMBERJACK_PROTO_VERSION_V2,
         .timeout                = 10,
-        .batch                  = 200,
+        .batch                  = 1,
         .with_ssl               = true,
         .metric_interval        = 5,
         .metric_enable          = true,
@@ -32,6 +32,7 @@ int main(void){
             } else {
                 int ack = client->wait_and_ack(client);
                 // printf("got ack: %d\n", ack);
+				sleep(1);
             }
         }
     }
